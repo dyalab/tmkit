@@ -16,6 +16,7 @@
                (:file "z3/api" :depends-on ("z3/lib"))
 
                (:file "package")
+	       (:file "z3/z3-operators" :depends-on ("package"))
 
                (:file "dir" :depends-on ("package"))
                (cffi-grovel:grovel-file "grovel" :depends-on ("dir"))
@@ -27,6 +28,8 @@
                (:file "task/cpdl" :depends-on ("util" "expression"))
                (:file "task/cpdl-plan" :depends-on ("task/cpdl"))
                (:file "task/pddl-sat" :depends-on ("task/cpdl-plan"))
+	       (:file "task/cpdl-path-checker" :depends-on ("task/pddl-sat"))
+	       (:file "task/pddl-path-checker" :depends-on ("task/cpdl-path-checker"))
 
                (:file "smtlib" :depends-on ("util"))
                (:file "smtrun" :depends-on ("smtlib"))
