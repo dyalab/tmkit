@@ -5,7 +5,7 @@
 	 (func (compile-transition (constrained-domain-transition-clauses cpdl)))
 	 (ground (ground-domain operator facts))
 	 (start (recurse-effects (ground-domain-start ground)
-				 (make-tree-map #'gsymbol-compare) nil t)))
+				 (make-tree-map #'gsymbol-compare) t)))
     (action-state-checker start func path-actions (create-ground-action-hash ground))))
 
 (defun action-state-checker (now-state func path-actions ground-actions)
@@ -21,15 +21,15 @@
   (let ((next-state now-state)
 	(ground-action (gethash path-action ground-actions)))
     (assert (not (equal ground-action nil)) (ground-action) "No action found")
-    (recurse-effects (ground-action-effect ground-action) next-state now-state t)))
+    (recurse-effects (ground-action-effect ground-action) next-state t)))
 
-(defun recurse-effects (effects next-map now-map truth)
+(defun recurse-effects (effects next-map truth)
   (cond
     ((equal 'not (car effects))
-     (setf next-map (recurse-effects (car (cdr effects)) next-map now-map (not truth))))
+     (setf next-map (recurse-effects (car (cdr effects)) next-map (not truth))))
     ((equal 'and (car effects))
      (dolist (effect (cdr effects))
-       (setf next-map (recurse-effects effect next-map now-map truth)))
+       (setf next-map (recurse-effects effect next-map truth)))
      next-map)
     ((equal '= (car effects))
      (tree-map-insert next-map (second effects) (third effects)))
