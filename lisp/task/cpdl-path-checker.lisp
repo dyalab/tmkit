@@ -18,7 +18,7 @@
 
 
 (defun map-tf (exp)
-  (if (or (equal exp 'true) (equal exp t))
+  (if (or (equal exp 'true) (equal exp t) (equal exp :true))
       t
       nil))
 

@@ -229,3 +229,11 @@ demo/sussman-scene.c:
 lib_LTLIBRARIES += demo/tmkit-sussman-scene.la
 demo_tmkit_sussman_scene_la_SOURCES = demo/sussman-scene.c
 demo_tmkit_sussman_scene_la_LDFLAGS = -avoid-version -module -shared -export-dynamic
+
+###########
+## Tests ##
+###########
+
+TESTS = test_path_checker
+noinst_PROGRAMS += test_path_checker
+test_path_checker_SOURCES = test/test_path_checker.c

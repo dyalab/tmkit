@@ -16,7 +16,6 @@
 	(and (funcall func now-state next-state)
 	     (action-state-checker next-state func (cdr path-actions) ground-actions)))))
 
-
 (defun make-next-state (now-state path-action ground-actions)
   (let ((next-state now-state)
 	(ground-action (gethash path-action ground-actions)))

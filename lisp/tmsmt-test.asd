@@ -6,4 +6,5 @@
   :depends-on ("tmsmt" "fiveam")
   :components (
                (:file "z3/test")
+	       (:file "task/test-path-checker-core")
                ))
