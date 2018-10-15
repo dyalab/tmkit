@@ -17,7 +17,7 @@
                        (not `(start ,a))
                        ;; TODO: check that we have a fluent
                        (= (assert (and (cdr args) (null (cddr args))))
-                          `(start= ,(first args) ,(second args)))
+                          `(start (= ,(first args) ,(second args))))
                        (otherwise
                         `(start ,a)))))))))
 
@@ -26,17 +26,18 @@
   (let* ((actions (ground-domain-operators ground))
          (fluents (ground-domain-variables ground))
          (hash (make-hash-table :test #'equal))  ;; hash: variable => (list modifiying-operators)
-         (empty-set (make-tree-set #'gsymbol-compare)))
-
+         (empty-set (make-tree-set #'gsymbol-compare))
+	 (axioms (ground-domain-axioms ground)))
+    
     ;; Index modified variables
     (loop for action in actions
        for op-exp = (fluent-now (pddl-sat-op action))
        do
-         (loop for v in (ground-action-modified-variables action)
+         (loop for v in (ground-action-modified-variables action axioms)
             for set = (gethash v hash empty-set)
             for setp = (tree-set-insert set op-exp)
             do (setf (gethash v hash) setp)))
-
+    
     ;; collect axioms
     (loop for f in fluents
        for now = (fluent-now f)
@@ -52,15 +53,16 @@
 
 (defun pddl-sat-transition (ground add-function)
   (let* ((actions (ground-domain-operators ground))
-         (action-fluents (map 'list #'pddl-sat-op actions)))
+         (action-fluents (map 'list #'pddl-sat-op actions))
+	 (axioms (ground-domain-axioms ground)))
     ;(with-collected (add)
     (flet ((add (arg) (funcall add-function arg)))
       ;; operator-encoding
       (loop for a in actions
          for op-exp in action-fluents
          do
-           (let ((pre (exp-now (ground-action-precondition a)))
-                 (eff (exp-next (ground-action-effect a))))
+           (let ((pre (exp-now (replace-axiom (ground-action-precondition a) axioms)))
+                 (eff (exp-next (replace-axiom (ground-action-effect a) axioms))))
              (add
               `(or (not (now ,op-exp))          ; action not active
                    (and ,(or pre '|true|)       ; precondition holds
@@ -76,34 +78,48 @@
       ;; frame
       (map nil #'add (pddl-sat-frame ground)))))
 
+(defun replace-axiom (exp axiom-list)
+  (typecase exp
+    (atom exp)
+    (t
+     (let ((res nil))
+       (dolist (a axiom-list)
+	 (if (equal exp (cadr a))
+	     (setf res (replace-axiom (caddr a) axiom-list))))
+       (if (null res)
+	   (dolist (x exp)
+	     (setf res (append res (list (replace-axiom x axiom-list))))))
+       res))))
+
+
 (defun pddl-sat-domain (operators facts)
   (let* ((operators (load-operators operators))
          (facts (load-facts facts))
          (ground (ground-domain operators facts)))
-  (parse-cpdl
-   (with-collected (add)
-     ;; State variables
-     (do-map (k v (ground-domain-variable-type ground))
-       (add `(declare-fluent ,k ,v)))
-
-     ;; Action variables
-     (dolist (a (ground-domain-operators ground))
-       (let ((a (pddl-sat-op a)))
-         (add `(declare-fluent ,a bool))
-         (add `(output ,a))))
-
-     ;; Start
-     (pddl-sat-start ground #'add)
-
-     ;; Goal
-     (destructuring-ecase (ground-domain-goal ground)
-       ((and &rest args)
-        (dolist (a args)
-          (add `(goal ,a)))))
-
-     ;; Transition
-     (pddl-sat-transition ground
-                          (lambda (x) (add `(transition ,x))))))))
+    (parse-cpdl
+     (with-collected (add)
+       ;; State variables
+       (do-map (k v (ground-domain-variable-type ground))
+	 (add `(declare-fluent ,k ,v)))
+       
+       ;; Action variables
+       (dolist (a (ground-domain-operators ground))
+	 (let ((a (pddl-sat-op a)))
+	   (add `(declare-fluent ,a bool))
+	   (add `(output ,a))))
+       
+       ;; Start
+       (pddl-sat-start ground #'add)
+       
+       ;; Goal
+       (destructuring-ecase (ground-domain-goal ground)
+	 ((and &rest args)
+	  (dolist (a args)
+	    (add `(goal ,(replace-axiom a (ground-domain-axioms ground)))))))
+       
+       ;; Transition
+       (pddl-sat-transition ground
+			    (lambda (x) (add `(transition ,x))))))))
 
 
 (defun pddl-sat (operators facts &optional options)

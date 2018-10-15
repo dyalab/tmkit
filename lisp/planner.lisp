@@ -186,10 +186,10 @@
                          (rec (cdr rest)))))))
         (rec things)))))
 
-(defun ground-action-modified-variables (action)
+(defun ground-action-modified-variables (action &optional axioms)
   (destructuring-bind (-and &rest things) (ground-action-effect action)
     (check-symbol -and 'and)
-    (loop for exp in things
+    (loop for exp in (replace-axiom things axioms)
        collect
          (destructuring-case exp
            ((not x) x)
@@ -247,7 +247,7 @@
          (ground-operators (smt-ground-actions (pddl-operators-actions operators)
                                                type-objects))
          (initial-true (pddl-facts-init facts))
-         (bool-vars (loop for g in ground-variables
+	 (bool-vars (loop for g in ground-variables
                        when (eq 'bool (tree-map-find variable-type g))
                        collect g))
          (initial-false (set-difference  bool-vars initial-true :test #'equal)))
