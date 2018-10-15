@@ -16,14 +16,18 @@
 (defun test-path-checker ()
   (run! 'all-tests))
 
-;;;map-tf tests
-(test map-true-false
-  (is (equal t (tmsmt::map-tf t)))
-  (is (equal t (tmsmt::map-tf 'true)))
-  (is (equal t (tmsmt::map-tf :true)))
-  (is (equal nil (tmsmt::map-tf nil)))
-  (is (equal nil (tmsmt::map-tf 'false)))
-  (is (equal nil (tmsmt::map-tf :false))))
+;;;convert z3 readable symbols to lisp symbols tests
+(test z3-to-lisp
+  (is (equal t (tmsmt::z3->lisp t)))
+  (is (equal t (tmsmt::z3->lisp 'true)))
+  (is (equal t (tmsmt::z3->lisp :true)))
+  (is (equal t (tmsmt::z3->lisp :sat)))
+  (is (equal nil (tmsmt::z3->lisp nil)))
+  (is (equal nil (tmsmt::z3->lisp 'false)))
+  (is (equal nil (tmsmt::z3->lisp :false)))
+  (is (equal nil (tmsmt::z3->lisp :unsat)))
+  (is (= 1 (tmsmt::z3->lisp 1)))
+  (is (= 1.0 (tmsmt::z3->lisp 1.0))))
 
 ;;;get-value tests
 (defun test-hash-get-value ()

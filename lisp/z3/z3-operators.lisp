@@ -25,3 +25,16 @@
   (if (equal b nil)
       t
       (and (not (member a b)) (distinct-list (car b) (cdr b)))))
+
+(defun z3->lisp (exp)
+  (typecase exp
+    (boolean exp)
+    (symbol
+     (ecase exp
+       (:true t)
+       (true t)
+       (:sat t)
+       (:false nil)
+       (false nil)
+       (:unsat nil)))
+    (otherwise exp)))

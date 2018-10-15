@@ -13,14 +13,9 @@
 
 (defun get-value(x state)
   (etypecase state
-    (hash-table (map-tf (gethash x state)))
-    (tree-map (map-tf (tree-map-find state x)))))
+    (hash-table (z3->lisp (gethash x state)))
+    (tree-map (z3->lisp (tree-map-find state x)))))
 
-
-(defun map-tf (exp)
-  (if (or (equal exp 'true) (equal exp t) (equal exp :true))
-      t
-      nil))
 
 
     

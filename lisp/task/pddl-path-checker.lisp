@@ -25,7 +25,7 @@
 (defun recurse-effects (effects next-map truth)
   (cond
     ((equal 'not (car effects))
-     (setf next-map (recurse-effects (car (cdr effects)) next-map (not truth))))
+     (recurse-effects (car (cdr effects)) next-map (not truth)))
     ((equal 'and (car effects))
      (dolist (effect (cdr effects))
        (setf next-map (recurse-effects effect next-map truth)))
@@ -36,21 +36,15 @@
      (tree-map-insert next-map effects truth))))
 
 (defun parse-cpdl-plan (plan)
-  (let ((actions ()))
-    (dolist (action plan)
-      (if (equal (cdr action) :TRUE)
-	  (setf actions (nconc actions (list (cdr (car action)))))))
-    actions))
+    (loop for (step . tf) in plan
+      if (eq tf :TRUE)
+	 collect (cdr step)))
 
 (defun create-ground-action-hash (ground)
   (let* ((ground-hash (make-hash-table :test 'equal)))
-    (map nil #'(lambda (ground-action) (setf (gethash
+    (map nil (lambda (ground-action) (setf (gethash
 					      (cons (ground-action-name ground-action)
 						    (ground-action-actual-arguments ground-action))
 					      ground-hash) ground-action))
 	 (ground-domain-operators ground))
     ground-hash))
-
-
-    
-  
