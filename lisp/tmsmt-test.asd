@@ -7,4 +7,5 @@
   :components (
                (:file "z3/test")
 	       (:file "task/test-path-checker-core")
+	       (:file "task/test-cpdl-core")
                ))

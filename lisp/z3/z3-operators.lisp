@@ -30,11 +30,12 @@
   (typecase exp
     (boolean exp)
     (symbol
-     (ecase exp
+     (case exp
        (:true t)
        (true t)
        (:sat t)
        (:false nil)
        (false nil)
-       (:unsat nil)))
+       (:unsat nil)
+       (otherwise exp)))
     (otherwise exp)))

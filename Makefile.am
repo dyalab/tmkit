@@ -237,3 +237,7 @@ demo_tmkit_sussman_scene_la_LDFLAGS = -avoid-version -module -shared -export-dyn
 TESTS = test_path_checker
 noinst_PROGRAMS += test_path_checker
 test_path_checker_SOURCES = test/test_path_checker.c
+
+TESTS += test_cpdl
+noinst_PROGRAMS += test_cpdl
+test_cpdl_SOURCES = test/test_cpdl.c

@@ -249,3 +249,30 @@
    (map-cpd-goals 'list
                   (lambda (c) `(goal ,c))
                   cpd)))
+
+(defun s-exp->probability (exp)
+  (destructuring-bind (op &rest args)
+      exp
+    (case op
+      (and (cons '* (loop for x in args
+		       collect (s-exp->probability x))))
+      (or (append '(- 1) (list (cons '* (loop for x in args
+					   collect `(- 1 ,(s-exp->probability x)))))))
+      (not `(- 1 ,(s-exp->probability (car args))))
+      (=> (destructuring-bind (a b)
+	      args
+	    (let ((a (s-exp->probability a))
+		  (b (s-exp->probability b)))
+	      `(- 1 (* ,a (- 1 (* ,a ,b)))))))
+      (<=> (destructuring-bind (a b)
+	       args
+	     (let ((a (s-exp->probability a))
+		   (b (s-exp->probability b)))
+	       `(* (- 1 (* ,a (- 1 (* ,a ,b))))
+		   (- 1 (* ,b (- 1 (* ,b ,a))))))))
+      (xor (destructuring-bind (a b)
+	       args
+	     (let ((a (s-exp->probability a))
+		   (b (s-exp->probability b)))
+	     `(* (- 1 (* ,a ,b)) (- 1 (* (- 1 ,a) (-1 ,b)))))))
+      (otherwise exp))))
