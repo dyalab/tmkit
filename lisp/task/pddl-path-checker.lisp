@@ -4,13 +4,20 @@
   (let* ((cpdl (pddl-sat-domain operator facts))
 	 (func (compile-transition (constrained-domain-transition-clauses cpdl)))
 	 (ground (ground-domain operator facts))
-	 (start (recurse-effects (ground-domain-start ground)
-				 (make-tree-map #'gsymbol-compare) t)))
-    (action-state-checker start func path-actions (create-ground-action-hash ground))))
+	 (start (initialize-map ground))
+	 (end-state (action-state-checker
+		     start
+		     func
+		     path-actions
+		     (create-ground-action-hash ground))))
+    (if end-state
+	(eval-state (subst 'equal '= (constrained-domain-goal-clauses cpdl))
+			     end-state)
+	nil)))
 
 (defun action-state-checker (now-state func path-actions ground-actions)
   (if (equal nil path-actions)
-      t
+      now-state
       (let ((next-state (make-next-state now-state (car path-actions) ground-actions)))
 	(setf now-state (tree-map-insert now-state (car path-actions) t))
 	(and (funcall func now-state next-state)
@@ -24,16 +31,23 @@
 
 (defun recurse-effects (effects next-map truth)
   (cond
-    ((equal 'not (car effects))
+    ((eq 'not (car effects))
      (recurse-effects (car (cdr effects)) next-map (not truth)))
-    ((equal 'and (car effects))
+    ((eq 'and (car effects))
      (dolist (effect (cdr effects))
        (setf next-map (recurse-effects effect next-map truth)))
      next-map)
-    ((equal '= (car effects))
-     (tree-map-insert next-map (second effects) (third effects)))
+    ((eq '= (car effects))
+     (tree-map-insert next-map (ensure-list (second effects)) (ensure-list (third effects))))
     (t
-     (tree-map-insert next-map effects truth))))
+     (tree-map-insert next-map (ensure-list effects) truth))))
+
+(defun initialize-map (ground)
+  (recurse-effects (ground-domain-start ground)
+   (fold (lambda (map x)
+	  (tree-map-insert map (ensure-list x) (ensure-list x)))
+	 (make-tree-map #'gsymbol-compare)
+	 (ground-domain-variables ground)) t))
 
 (defun parse-cpdl-plan (plan)
     (loop for (step . tf) in plan

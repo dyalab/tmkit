@@ -60,19 +60,31 @@
 (defun create-state-variables (functions type-objects)
   "Create all state variables from `PREDICATES' applied to `OBJECTS'"
   (fold (lambda (map f)
-          (fold (lambda (map args)
-                  (tree-map-insert map
-                                   (cons (pddl-function-name f) args)
-                                   (pddl-function-type f)))
-                map
-                (collect-args (pddl-function-arguments f)
-                              type-objects)))
-        (make-tree-map #'gsymbol-compare)
-        functions))
+	  (fold (lambda (map args)
+		  (tree-map-insert map
+				   (cons (pddl-function-name f) args)
+				   (pddl-function-type f)))
+		map
+		(collect-args (pddl-function-arguments f)
+			      type-objects)))
+	(make-tree-map #'gsymbol-compare)
+	functions))
+
+(defun create-full-state-variables (functions type-objects)
+  "Creates all state variables and adds in the basic objects as variables as well"
+    (fold (lambda (map obj-type)
+	    (destructuring-bind (obj1 type)
+		obj-type
+	      (tree-map-insert map obj1 type)))
+	  (create-state-variables functions type-objects)
+	  (loop for type in (type-map-keys type-objects)
+	     if (not (or (eq 'bool type) (eq t type)))
+	     append (loop for obj in (tree-set-list (tree-map-find type-objects type))
+		       collect (list obj type)))))
+				 
 
 
-
-  ;; (let ((variable-type (make-hash-table :test #'equal)))
+;; (let ((variable-type (make-hash-table :test #'equal)))
   ;;   (dolist (f functions)
   ;;     ;; apply p to all valid arguments
   ;;     (dolist (args (collect-args (pddl-function-arguments f)
@@ -225,7 +237,21 @@
                                 (make-tree-set #'gsymbol-compare)
                                 map)))
 
-
+(defun collect-variables (exp variables)
+  (cond
+    ((loop for var in variables
+	if (equal exp var)
+	  collect exp)
+     (list exp))
+    ((not exp)
+     nil)
+    (t
+     (typecase exp
+       (atom nil)
+       (otherwise
+	(loop for args in exp
+	   append (collect-variables args variables)))))))
+  
 ;; TODO: ground derived types
 ;;       - add to variables (separate slot for derived variables)
 ;;       - add axioms indicating state
@@ -241,36 +267,43 @@
                           (pddl-facts-objects facts)))
          (type-objects (compute-type-map (pddl-operators-types operators)
                                          objects))
-         (variable-type (create-state-variables (pddl-operators-functions operators)
-                                                type-objects))
-         (ground-variables (type-map-keys variable-type))
+	 (variable-type (create-state-variables (pddl-operators-functions operators)
+						type-objects))
+	 (full-variable-type (create-full-state-variables
+			      (pddl-operators-functions operators)
+			      type-objects))
+	 (ground-variables (type-map-keys variable-type))
+	 (full-ground-variables (type-map-keys full-variable-type))
          (ground-operators (smt-ground-actions (pddl-operators-actions operators)
-                                               type-objects))
-         (initial-true (pddl-facts-init facts))
-	 (bool-vars (loop for g in ground-variables
-                       when (eq 'bool (tree-map-find variable-type g))
-                       collect g))
-         (initial-false (set-difference  bool-vars initial-true :test #'equal)))
+                                               type-objects)))
     (ecase action-encoding
       (:boolean)
       (:enum (push (make-ground-action :name 'no-op
                                        :effect '(and))
                    ground-operators)))
+
+    
     (multiple-value-bind (derived-type derived-axioms)
         (ground-derived type-objects (pddl-operators-derived operators))
-      (make-ground-domain :variables ground-variables
-                          :variable-type variable-type
-                          :derived-variables (type-map-keys derived-type)
-                          :derived-type derived-type
-                          :type-objects type-objects
-                          :types (type-map-types variable-type)
-                          :operators ground-operators
-                          :axioms derived-axioms
-                          :action-encoding action-encoding
-                          :start  `(and ,@initial-true
-                                        ,@(loop for v in initial-false collect `(not ,v)))
-                          :goal (or goal (pddl-facts-goal facts))))))
-
+      (let* ((initial-true (replace-axiom (pddl-facts-init facts) derived-axioms))
+	     (bool-vars (loop for g in ground-variables
+			   when (eq 'bool (tree-map-find variable-type g))
+			   collect g))
+	     (initial-false (set-difference  bool-vars
+					     (collect-variables initial-true ground-variables)
+					     :test #'equal)))
+	(make-ground-domain :variables full-ground-variables
+			    :variable-type full-variable-type
+			    :derived-variables (type-map-keys derived-type)
+			    :derived-type derived-type
+			    :type-objects type-objects
+			    :types (type-map-types full-variable-type)
+			    :operators ground-operators
+			    :axioms derived-axioms
+			    :action-encoding action-encoding
+			    :start  `(and ,@initial-true
+					  ,@(loop for v in initial-false collect `(not ,v)))
+			    :goal (or goal (pddl-facts-goal facts)))))))
 
 (defun smt-frame-axioms-exp (state-vars ground-actions i j action-encoding)
   ;(print ground-operators)

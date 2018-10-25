@@ -159,7 +159,10 @@
      (cpdl-declare-fluent cpd name type))
     ((start thing)
      (flet ((add-start (fluent value)
-              (let ((fluent (ensure-list fluent)))
+		(let ((fluent (ensure-list fluent))
+		      (value (if (or (eq 'true value) (eq 'false value))
+				 value
+				 (ensure-list value))))
                 (check-cpdl-fluent cpd fluent t)
                 (let ((hash (constrained-domain-start-map cpd)))
                   (when (hash-table-contains fluent hash)
@@ -168,7 +171,8 @@
        (if (consp thing)
            (destructuring-case thing
              ((not fluent)
-              (add-start fluent 'false))
+	      (if (not (and (consp fluent) (eq '= (car fluent))))
+		  (add-start fluent 'false)))
              ((= fluent exp)
               (add-start fluent exp))
              ((t &rest rest)

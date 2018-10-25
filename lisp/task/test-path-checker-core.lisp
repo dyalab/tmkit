@@ -126,11 +126,27 @@
     (if tf
 	(setf (getHash 'a2 h3) :true)
 	(setf (getHash 'a2 h3) :false))
-    (tmsmt::path-checker h1 (list h2 h3) (tmsmt::compile-transition sexp))))
+    (tmsmt::path-checker-recursive h1 (list h2 h3) (tmsmt::compile-transition sexp))))
 
 (test cpdl-path-checker
-  (is (equal t (test-cpdl-path-checker)))
-  (is (equal nil (test-cpdl-path-checker nil))))
+  (is (test-cpdl-path-checker))
+  (is (not (test-cpdl-path-checker nil))))
+
+(defun test-eval-state (exp alist)
+  (let* ((h1 (alist-hash-table alist :test 'equal))
+	 (t1 (tree-map-insert-alist (make-tree-map  #'tmsmt::gsymbol-compare) alist))
+	 (h-eval (tmsmt::eval-state exp h1))
+	 (t-eval (tmsmt::eval-state exp t1)))
+    (if (equal h-eval t-eval)
+	h-eval
+	nil)))
+
+    
+  
+(test eval-state
+  (is (not (test-eval-state '((and a b)) '((a . t)(b . nil)))))
+  (is (test-eval-state '((and (or a b c) (=> d b))) '((a . t)(b . nil)(c . t)(d . nil)))))
+				 
 
 ;;;testing parse cpdl plan
 (defun make-and-parse-plan ()
@@ -205,8 +221,23 @@
 					   tmsmt::*tmsmt-root*)
 					  (merge-pathnames
 					   #p"demo/domains/blocksworld/tm-sussman.pddl"
+					   tmsmt::*tmsmt-root*)))))))
+  (is (equal t (tmsmt::pddl-path-check (merge-pathnames
+					#p"demo/domains/linear-blocksworld/linear-blocksworld.pddl"
+					tmsmt::*tmsmt-root*)
+				       (merge-pathnames
+					#p"demo/domains/linear-blocksworld/linear-sussman.pddl"
+					tmsmt::*tmsmt-root*)
+				       (tmsmt::parse-cpdl-plan
+					(tmsmt::cpd-plan
+					 (tmsmt::pddl-sat-domain
+					  (merge-pathnames
+					   #p"demo/domains/linear-blocksworld/linear-blocksworld.pddl"
+					   tmsmt::*tmsmt-root*)
+					  (merge-pathnames
+					   #p"demo/domains/linear-blocksworld/linear-sussman.pddl"
 					   tmsmt::*tmsmt-root*))))))))
-				      
+
 
 
   

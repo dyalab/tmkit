@@ -432,9 +432,6 @@
       (smt-op context e)
       (smt-atom context e)))
 
-
-
-
 (defun smt-assert (solver exp)
   (declare (type z3-solver solver))
   (let ((context  (z3-solver-context solver)))

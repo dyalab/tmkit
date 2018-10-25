@@ -12,7 +12,7 @@ I: The step to unroll at"
          (mangle-cache (constrained-domain-mangle-cache cpd))
          (key (cons i fluent)))
     (declare (dynamic-extent key)
-             (type list fluent))
+	     (type list fluent))
     (or (gethash key mangle-cache)
         (let ((m (format nil "~{~A~^_~}_~D" fluent i))
               (key (copy-list key)))
@@ -22,6 +22,7 @@ I: The step to unroll at"
 
 (declaim (ftype (function (constrained-domain list fixnum) string)
                 cpd-mangle-exp))
+
 (defun cpd-mangle-exp (cpd exp i)
   (apply-rewrite-exp (lambda (exp) (cpd-mangle-fluent cpd exp i))
                      exp))
@@ -105,9 +106,27 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
                               (case value
                                 (true `(assert ,name))
                                 (false `(assert (not ,name)))
-                                (otherwise `(assert (= ,name ,value)))))))
-                 domain))
+                                (otherwise `(assert (= ,name ,(cpd-mangle-fluent
+							       domain
+							       value
+							       0))))))))
+                 domain)
+  (let ((non-bools (remove nil (map-cpd-fluent-types 'list
+					 (lambda (name type)
+					   (if (not (eq type 'bool))
+					       name))
+					 domain))))
+    (dolist (name1 non-bools)
+      (dolist (name2 non-bools)
+	(if (not (or (eq name1 name2) (in-start name1 name2 domain)))
+	    (funcall function  `(assert (not (= ,(cpd-mangle-fluent domain name1 0)
+					    ,(cpd-mangle-fluent domain name2 0))))))))))
 
+(defun in-start (name1 name2 domain)
+  (or (equal (gethash name1 (constrained-domain-start-map domain)) name2)
+      (equal (gethash name2 (constrained-domain-start-map domain)) name1)))
+
+				      
 (defun cpd-smt-encode-goal (function domain step)
   "Encode the goal state at STEP"
   (map-cpd-goals nil

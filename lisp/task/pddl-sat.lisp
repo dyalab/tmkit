@@ -100,7 +100,9 @@
      (with-collected (add)
        ;; State variables
        (do-map (k v (ground-domain-variable-type ground))
-	 (add `(declare-fluent ,k ,v)))
+	 (if (eq v 'bool)
+	     (add `(declare-fluent ,k ,v))
+	     (add `(declare-fluent ,k int))))
        
        ;; Action variables
        (dolist (a (ground-domain-operators ground))
