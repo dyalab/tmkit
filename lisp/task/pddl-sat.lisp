@@ -73,7 +73,9 @@
       (dolist (op-a action-fluents)
         (add `(=> ,(fluent-now op-a)
                   (and ,@(loop for op-b in action-fluents
-                            unless (equal op-a op-b)
+                            unless (or (equal op-a op-b) (not (intersection (cdr op-a)
+								       (cdr op-b)
+								       :test #'equal)))
                             collect `(not ,(fluent-now op-b)))))))
       ;; frame
       (map nil #'add (pddl-sat-frame ground)))))

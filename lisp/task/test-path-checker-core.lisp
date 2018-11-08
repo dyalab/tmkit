@@ -156,24 +156,26 @@
 				      (merge-pathnames #p"demo/domains/blocksworld/tm-sussman.pddl"
 						       tmsmt::*tmsmt-root*))))
 	 (parsed-plan (tmsmt::parse-cpdl-plan cpdl-plan)))
-    (check-plan cpdl-plan parsed-plan 0)))
+    (check-plan cpdl-plan parsed-plan)))
 
-(defun check-plan (cpdl-plan parsed-plan step)
+(defun check-plan (cpdl-plan parsed-plan)
+  (let ((hash (make-hash-table :test 'equal)))
+    (loop for (a . b) in cpdl-plan
+       when (tmsmt::smt-true-p b)
+       do (setf (gethash (car a) hash) (cons (cdr a) (gethash (car a) hash))))
+    (check-plan-recursive hash parsed-plan 0)))
+
+(defun check-plan-recursive (step-hash parsed-plan step)  
   (cond
-    ((and (equal parsed-plan nil) (equal cpdl-plan nil))
-     t)
     ((equal parsed-plan nil)
-     (if (equal (cdar cpdl-plan) :TRUE)
-	 nil
-	 (check-plan (cdr cpdl-plan) nil step)))
-    ((equal cpdl-plan nil)
+     t)
+    ((equal (gethash step step-hash) nil)
      nil)
-    ((equal (cdar cpdl-plan) :TRUE)
-     (if (equal (caar cpdl-plan) (cons step (car parsed-plan)))
-	 (check-plan (cdr cpdl-plan) (cdr parsed-plan) (+ step 1))
-	 nil))
     (t
-     (check-plan (cdr cpdl-plan) parsed-plan step))))
+     (let ((actions (gethash step step-hash)))
+       (if (find (car parsed-plan) actions)
+	   (check-plan-recursive step-hash (cdr parsed-plan) step)
+	   (check-plan-recursive step-hash parsed-plan (+ step 1)))))))
 
 (test parse-cpdl-plan
   (is (equal t (make-and-parse-plan))))
