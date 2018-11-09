@@ -49,11 +49,6 @@
 	 (make-tree-map #'gsymbol-compare)
 	 (ground-domain-variables ground)) t))
 
-(defun parse-cpdl-plan (plan)
-    (loop for (step . tf) in plan
-      if (eq tf :TRUE)
-	 collect (cdr step)))
-
 (defun create-ground-action-hash (ground)
   (let* ((ground-hash (make-hash-table :test 'equal)))
     (map nil (lambda (ground-action) (setf (gethash

@@ -118,13 +118,19 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
 					 domain))))
     (dolist (name1 non-bools)
       (dolist (name2 non-bools)
-	(if (not (or (eq name1 name2) (in-start name1 name2 domain)))
+	(if (not (or (eq name1 name2) (in-start name1 name2 (constrained-domain-start-map domain))))
 	    (funcall function  `(assert (not (= ,(cpd-mangle-fluent domain name1 0)
 					    ,(cpd-mangle-fluent domain name2 0))))))))))
 
-(defun in-start (name1 name2 domain)
-  (or (equal (gethash name1 (constrained-domain-start-map domain)) name2)
-      (equal (gethash name2 (constrained-domain-start-map domain)) name1)))
+(defun in-start (name1 name2 start-hash)
+  (cond
+    ((or (not name1) (not name2))
+     nil)
+    (t
+     (or (equal (gethash name1 start-hash) name2)
+	 (equal (gethash name2 start-hash) name1)
+	 (in-start (gethash name1 start-hash) name2 start-hash)
+	 (in-start name1 (gethash name2 start-hash) start-hash)))))
 
 				      
 (defun cpd-smt-encode-goal (function domain step)

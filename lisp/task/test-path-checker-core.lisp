@@ -155,7 +155,7 @@
 						       tmsmt::*tmsmt-root*)
 				      (merge-pathnames #p"demo/domains/blocksworld/tm-sussman.pddl"
 						       tmsmt::*tmsmt-root*))))
-	 (parsed-plan (tmsmt::parse-cpdl-plan cpdl-plan)))
+	 (parsed-plan (tmsmt::cpd-actions cpdl-plan)))
     (check-plan cpdl-plan parsed-plan)))
 
 (defun check-plan (cpdl-plan parsed-plan)
@@ -215,7 +215,7 @@
 							tmsmt::*tmsmt-root*)
 				       (merge-pathnames #p"demo/domains/blocksworld/tm-sussman.pddl"
 							tmsmt::*tmsmt-root*)
-				       (tmsmt::parse-cpdl-plan
+				       (tmsmt::cpd-actions
 					(tmsmt::cpd-plan
 					 (tmsmt::pddl-sat-domain
 					  (merge-pathnames
@@ -230,7 +230,7 @@
 				       (merge-pathnames
 					#p"demo/domains/linear-blocksworld/linear-sussman.pddl"
 					tmsmt::*tmsmt-root*)
-				       (tmsmt::parse-cpdl-plan
+				       (tmsmt::cpd-actions
 					(tmsmt::cpd-plan
 					 (tmsmt::pddl-sat-domain
 					  (merge-pathnames

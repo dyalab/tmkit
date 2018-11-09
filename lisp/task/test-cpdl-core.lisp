@@ -3,7 +3,7 @@
 (require :fiveam)
 
 (defpackage cpdl/test
-  (:use :tmsmt :cl :alexandria :cffi :smt-symbol :sycamore :fiveam))
+  (:use :tmsmt :cl :alexandria :cffi :smt-symbol :sycamore :sycamore-util :fiveam))
 
 
 (in-package :cpdl/test)
@@ -32,3 +32,21 @@
       (is (equal '(- 1 (* (- 1 (a)) (- 1 (b)) (- 1 (c))))
 		 (tmsmt::s-exp->probability '(or (a) (b) (c)))))
       (is (equal '(* (- 1 (a)) (b)) (tmsmt::s-exp->probability '(and (not (a)) (b))))))
+
+
+;;test equality generation via in-start
+(test in-start
+  (is (equal t (test-in-start '((a . b) (b . c) (c . d) (d . 'true)) '((a . b) (a . c) (a . d)))))
+  (is (equal t (test-in-start '((a . b) (b . c) (c . d) (d . 'true)) '((b . a) (b . c) (b . d)))))
+  (is (equal t (test-in-start '((a . b) (b . c) (c . d) (d . 'true)) '((c . a) (c . b) (c . d)))))
+  (is (equal t (test-in-start '((a . b) (b . c) (c . d) (d . 'true)) '((d . a) (d . b) (d . c)))))
+  (is (equal nil (test-in-start '((a . b) (c . d)) '((a . d))))))
+
+(defun test-in-start (alist check-list)
+  (let ((test-hash (alist-hash-table alist :test 'equal)))
+    (fold (lambda (val test)
+	    (and val (tmsmt::in-start (car test) (cdr test) test-hash)))
+	  t
+	  check-list)))
+    
+    

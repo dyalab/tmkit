@@ -54,29 +54,42 @@
 (defun pddl-sat-transition (ground add-function)
   (let* ((actions (ground-domain-operators ground))
          (action-fluents (map 'list #'pddl-sat-op actions))
-	 (axioms (ground-domain-axioms ground)))
+	 (axioms (ground-domain-axioms ground))
+	 (variable-type-tree (ground-domain-variable-type ground)))
     ;(with-collected (add)
     (flet ((add (arg) (funcall add-function arg)))
       ;; operator-encoding
       (loop for a in actions
          for op-exp in action-fluents
          do
-           (let ((pre (exp-now (replace-axiom (ground-action-precondition a) axioms)))
-                 (eff (exp-next (replace-axiom (ground-action-effect a) axioms))))
+           (let* ((pre (exp-now (replace-axiom (ground-action-precondition a) axioms)))
+                 (eff (exp-next (replace-axiom (ground-action-effect a) axioms)))
+		 (var-used (remove-duplicates (append (find-variables pre variable-type-tree)
+				   (find-variables eff variable-type-tree)))))
              (add
               `(or (not (now ,op-exp))          ; action not active
                    (and ,(or pre '|true|)       ; precondition holds
                         ,(if (equal '(and) eff) ; effect holds
                              '|true|
-                             eff))))))
-      ;; exclusion
-      (dolist (op-a action-fluents)
-        (add `(=> ,(fluent-now op-a)
-                  (and ,@(loop for op-b in action-fluents
-                            unless (or (equal op-a op-b) (not (intersection (cdr op-a)
-								       (cdr op-b)
-								       :test #'equal)))
-                            collect `(not ,(fluent-now op-b)))))))
+                             eff))))
+	     ;; exclusion
+	     (add `(=> ,(fluent-now op-exp)
+		       (and ,@(loop for b in actions
+				 for op-b in action-fluents
+                            unless (or (equal op-exp op-b) (not
+						       (intersection
+							var-used
+							(append (find-variables
+								 (replace-axiom
+								  (ground-action-precondition b)
+								  axioms) variable-type-tree)
+								(find-variables
+								  (replace-axiom
+								   (ground-action-precondition b)
+								   axioms) variable-type-tree))
+							:test #'equal)))
+                            collect `(not ,(fluent-now op-b))))))))
+      
       ;; frame
       (map nil #'add (pddl-sat-frame ground)))))
 
@@ -92,6 +105,16 @@
 	   (dolist (x exp)
 	     (setf res (append res (list (replace-axiom x axiom-list))))))
        res))))
+
+(defun find-variables (exp var-tree)
+  (cond
+    ((eq exp nil)
+     nil)    
+    ((tree-map-find var-tree exp)
+     (list exp))
+    (t
+     (loop for e in (cdr exp)
+	  append (find-variables e var-tree)))))
 
 
 (defun pddl-sat-domain (operators facts)
