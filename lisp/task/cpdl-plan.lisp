@@ -126,11 +126,13 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
   (cond
     ((or (not name1) (not name2))
      nil)
+    ((not (gethash name1 start-hash))
+     (or (equal (gethash name2 start-hash) name1)
+	 (in-start name1 (gethash name2 start-hash) start-hash)))
     (t
      (or (equal (gethash name1 start-hash) name2)
 	 (equal (gethash name2 start-hash) name1)
-	 (in-start (gethash name1 start-hash) name2 start-hash)
-	 (in-start name1 (gethash name2 start-hash) start-hash)))))
+	 (in-start (gethash name1 start-hash) name2 start-hash)))))
 
 				      
 (defun cpd-smt-encode-goal (function domain step)
