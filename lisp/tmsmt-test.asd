@@ -6,6 +6,6 @@
   :depends-on ("tmsmt" "fiveam")
   :components (
                (:file "z3/test")
-	       (:file "task/test-path-checker-core")
-	       (:file "task/test-cpdl-core")
+	       (:file "test/test-path-checker-core")
+	       (:file "test/test-cpdl-core")
                ))
