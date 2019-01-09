@@ -75,7 +75,8 @@
   objects
   type-map
   init
-  goal)
+  goal
+  metric)
 
 ;; TYPE QUERIES
 ;; Given: argument type, objects and type
@@ -347,7 +348,10 @@ RETURNS: (VALUES pddl-sexp (or :domain :problem))"
                  things))
           ((:goal goal)
            (setf (pddl-facts-goal facts)
-                 goal))))
+                 goal))
+	  ((:metric metric)
+	   (setf (pddl-facts-metric facts)
+		 metric))))
       facts)))
 
 (defun pddl-exp-rope (exp)

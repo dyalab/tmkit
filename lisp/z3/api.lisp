@@ -60,9 +60,29 @@
           (z3-solver-trace solver) trace)
     solver))
 
+(defun make-optimizer (&key context trace)
+  (let* ((context (or context (z3-mk-context (z3-mk-config))))
+         (solver (z3-mk-optimize context)))
+    ;; Seems that we get an initial refcount of 0?
+    (z3-solver-inc-ref context solver)
+    (z3-set-error-handler context (callback error-callback))
+    (setf (z3-optimize-context solver) context
+          (z3-optimize-trace solver) trace)
+    solver))
+
+(defmacro choose-solver ((use-solver solver &key trace) &body body)
+  `(if ,use-solver
+      (with-solver (,solver :trace ,trace)
+	 ,@body)
+      (with-optimizer (,solver :trace ,trace)
+	 ,@body)))
 
 (defmacro with-solver ((solver &key trace) &body body)
   `(let ((,solver (make-solver :trace ,trace)))
+     ,@body))
+
+(defmacro with-optimizer ((solver &key trace) &body body)
+  `(let ((,solver (make-optimizer :trace ,trace)))
      ,@body))
 
 
@@ -70,7 +90,7 @@
 (defvar *solver*)
 
 (defun smt-trace (solver thing)
-  (when-let (trace (z3-solver-trace solver))
+  (when-let (trace (z3-get-trace solver))
     (format trace "~&~A" thing)))
 
 (defun smt-normalize-id (key)
@@ -432,22 +452,32 @@
       (smt-op context e)
       (smt-atom context e)))
 
-(defun smt-assert (solver exp)
-  (declare (type z3-solver solver))
-  (let ((context  (z3-solver-context solver)))
+(defun smt-assert (solver exp &optional context)
+  ;;(declare (type z3-solver solver))
+  (let ((context  (or context (z3-get-context solver))))
     (z3-solver-assert context solver (smt->ast context exp))))
 
-(defun smt-check  (solver)
-  (ecase (z3-solver-check (z3-solver-context solver) solver)
+(defun smt-check  (solver &optional context)
+  (ecase (z3-solver-check (or context (z3-get-context solver)) solver)
     (:true :sat)
     (:undef :unknown)
     (:false :unsat)))
 
+(defun smt-minimize (solver exp &optional context)
+  (declare (type z3-optimize solver))
+  (let ((context (or context (z3-optimize-context solver))))
+    (z3-optimize-minimize context solver (smt->ast context exp))))
+
+(defun smt-maximize (solver exp &optional context)
+  (declare (type z3-optimize solver))
+  (let ((context (or context (z3-optimize-context solver))))
+    (z3-optimize-maximize context solver (smt->ast context exp))))
+
 (defun smt-eval (solver stmt)
-  (declare (type z3-solver solver))
+  ;;(declare (type z3-solver solver))
   (smt-trace solver stmt)
   (flet ((context ()
-           (z3-solver-context solver)))
+	   (z3-get-context solver)))
     (destructuring-ecase stmt
       ;; declarations
       (((declare-fun |declare-fun| :declare-fun) name args type)
@@ -462,18 +492,23 @@
        (smt-define-fun (context) name args type body))
       ;; Asssertions
       (((assert |assert| :assert) exp)
-       (smt-assert solver exp))
+       (smt-assert solver exp (context)))
       ;; Checking
       (((check-sat |check-sat| :check-sat))
-       (smt-check solver))
+       (smt-check solver (context)))
       (((get-value |get-value| :get-value) symbols)
-       (smt-values solver symbols))
+       (smt-values solver symbols (context)))
       ;; Stack
       (((push |push| :push) &optional (count 1))
        (dotimes (i count)
          (z3-solver-push (context) solver)))
       (((pop |pop| :pop) &optional (count 1))
-       (z3-solver-pop (context) solver count)))))
+       (z3-solver-pop (context) solver count))
+      ;;optimization
+      (((minimize |minimize| :minimize) exp)
+       (smt-minimize solver exp (context)))
+      (((maximize |maximize| :maximize) exp)
+       (smt-maximize solver exp (context))))))
 
 (defun smt-value-int (context ast)
   (with-foreign-object (i :int)
@@ -500,9 +535,9 @@
 
 
 
-(defun smt-values (solver symbols)
-  (declare (type z3-solver solver))
-  (let* ((context (z3-solver-context solver))
+(defun smt-values (solver symbols &optional context)
+  ;;(declare (type z3-solver solver))
+  (let* ((context (or context (z3-get-context solver)))
          (m (z3-solver-get-model context solver)))
     (z3-model-inc-ref context m)
     (unwind-protect

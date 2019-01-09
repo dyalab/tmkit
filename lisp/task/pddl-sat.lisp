@@ -85,7 +85,7 @@
 								  axioms) variable-type-tree)
 								(find-variables
 								  (replace-axiom
-								   (ground-action-precondition b)
+								   (ground-action-effect b)
 								   axioms) variable-type-tree))
 							:test #'equal)))
                             collect `(not ,(fluent-now op-b))))))))
@@ -112,6 +112,8 @@
      nil)    
     ((tree-map-find var-tree exp)
      (list exp))
+    ((atom exp)
+     nil)
     (t
      (loop for e in (cdr exp)
 	  append (find-variables e var-tree)))))
@@ -146,7 +148,10 @@
        
        ;; Transition
        (pddl-sat-transition ground
-			    (lambda (x) (add `(transition ,x))))))))
+			    (lambda (x) (add `(transition ,x))))
+
+       ;;metric
+       (add `(metric ,(ground-domain-metric ground)))))))
 
 
 (defun pddl-sat (operators facts &optional options)

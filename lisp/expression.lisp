@@ -23,22 +23,32 @@ Converts arrays to lists."
     (atom (funcall function exp))
     (list
      (destructuring-case exp
-       (((and or not = "=" => <=>) &rest args)
+       (((and or not = "=" => <=> >= > < <= - + / *) &rest args)
         (dolist (a args)
           (check-exp function a)))
        ((t &rest rest) (declare (ignore rest))
         (funcall function exp))))))
 
 
-(defun apply-rewrite-exp (function exp)
+(defun apply-rewrite-exp (function exp &optional next)
   (declare (type function function))
   (etypecase exp
-    (atom (funcall function exp))
+    (atom (if (numberp exp)
+	      exp
+	      (funcall function exp)))
     (list
      (destructuring-case exp
-       (((and or not = "=" => <=>) &rest rest)
+       (((and or not => <=> >= > < <= - + / *) &rest rest)
         (cons (car exp)
-              (loop for exp in rest collect (apply-rewrite-exp function exp))))
+              (loop for exp in rest collect (apply-rewrite-exp function exp next))))
+       (((= "=") &rest rest)
+	(assert (and (cdr rest) (null (cddr rest))))
+	(if next ;;special case if being called from exp-next. Equating next state to now state.
+	(cons (car exp)
+	      (list (apply-rewrite-exp function (car rest) next)
+		    (apply-rewrite-exp #'fluent-now (cadr rest))))
+	(cons (car exp)
+	      (loop for exp in rest collect (apply-rewrite-exp function exp next)))))
        ((t &rest rest) (declare (ignore rest))
         (funcall function exp))))))
 

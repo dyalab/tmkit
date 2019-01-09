@@ -205,7 +205,7 @@
        collect
          (destructuring-case exp
            ((not x) x)
-           ((= x y) (if (atom x) y x)) ;; TODO: maybe not general
+           ((= x y) x) ;; TODO: add assertion
            ((t &rest rest) (declare (ignore rest))
             exp)))))
 
@@ -222,6 +222,7 @@
   (axioms nil :type list)
   (start nil :type list)
   (goal nil :type list)
+  (metric nil :type list)
   action-encoding)
 
 (defun type-map-keys (map)
@@ -303,7 +304,8 @@
 			    :action-encoding action-encoding
 			    :start  `(and ,@initial-true
 					  ,@(loop for v in initial-false collect `(not ,v)))
-			    :goal (or goal (pddl-facts-goal facts)))))))
+			    :goal (or goal (pddl-facts-goal facts))
+			    :metric (pddl-facts-metric facts))))))
 
 (defun smt-frame-axioms-exp (state-vars ground-actions i j action-encoding)
   ;(print ground-operators)

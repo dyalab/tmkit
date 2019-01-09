@@ -60,4 +60,10 @@
 
    :=>
    :<=>
+
+   :minimize
+   :|minimize|
+
+   :maximize
+   :|maximize|
    ))

@@ -15,7 +15,7 @@
                (:file "z3/lib" :depends-on ("z3/type"))
                (:file "z3/api" :depends-on ("z3/lib"))
 
-               (:file "package")
+               (:file "package" :depends-on ("smt/smt-symbols"))
 	       (:file "z3/z3-operators" :depends-on ("package"))
 
                (:file "dir" :depends-on ("package"))

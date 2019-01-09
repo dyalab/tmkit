@@ -24,7 +24,7 @@
   (apply-rewrite-exp #'fluent-now exp))
 
 (defun exp-next (exp)
-  (apply-rewrite-exp #'fluent-next exp))
+  (apply-rewrite-exp #'fluent-next exp t))
 
 
 (defun cpdl-error (fmt &rest args)
@@ -57,6 +57,9 @@
 
   ;; list of clauses in goal set (implicit and)
   goal-clauses
+
+  ;;function to optimize for (if any)
+  metric
 
   ;; Caches
 
@@ -160,7 +163,7 @@
     ((start thing)
      (flet ((add-start (fluent value)
 		(let ((fluent (ensure-list fluent))
-		      (value (if (or (eq 'true value) (eq 'false value))
+		      (value (if (or (eq 'true value) (eq 'false value) (numberp value))
 				 value
 				 (ensure-list value))))
                 (check-cpdl-fluent cpd fluent t)
@@ -192,7 +195,10 @@
     ((output fluent)
      (let ((fluent (cpd-canonize-fluent cpd fluent)))
        (check-cpdl-fluent cpd fluent t)
-       (push fluent (constrained-domain-outputs cpd)))))
+       (push fluent (constrained-domain-outputs cpd))))
+    ((metric clause)
+     (assert (null (constrained-domain-metric cpd)))
+     (setf (constrained-domain-metric cpd) clause)))
   ;; Result
   cpd)
 

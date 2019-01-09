@@ -1,5 +1,5 @@
 (defpackage tmsmt/pddl
-  (:use :cl)
+  (:use :cl :smt-symbol)
   (:export
    :domain
    :define

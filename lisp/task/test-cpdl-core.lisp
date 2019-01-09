@@ -3,7 +3,7 @@
 (require :fiveam)
 
 (defpackage cpdl/test
-  (:use :tmsmt :cl :alexandria :cffi :smt-symbol :sycamore :sycamore-util :fiveam))
+  (:use :tmsmt :cl :alexandria :cffi :smt-symbol :sycamore :sycamore-util :z3 :fiveam))
 
 
 (in-package :cpdl/test)
@@ -48,5 +48,47 @@
 	    (and val (tmsmt::in-start (car test) (cdr test) test-hash)))
 	  t
 	  check-list)))
+
+(test smt-functions
+      (is-true (test-smt-functions)))
+
+(defun test-smt-functions ()
+  "Tests that smt functions that rely on a solver or optimizer and a context don't return an error"
+  (let* ((solver (z3::make-solver))
+	 (solver-context (z3::z3-get-context solver))
+	 (optimize (z3::make-optimizer))
+	 (optimize-context (z3::z3-get-context optimize)))
+
+    ;;declare constants
+    (z3::smt-declare-const solver-context 's1 'int)
+    (z3::smt-declare-const solver-context 's2 'int)
+    (z3::smt-declare-const solver-context 's3 'int)
+
+    (z3::smt-declare-const optimize-context 'o1 'int)
+    (z3::smt-declare-const optimize-context 'o2 'int)
+    (z3::smt-declare-const optimize-context 'o3 'int)
+
+    ;;make assertions
+    (z3::smt-assert solver '(= s1 1)) ;;no context given
+    (z3::smt-assert solver '(= s2 s3) solver-context) ;;context given
+
+    (z3::smt-assert optimize '(= o1 1))
+    (z3::smt-assert optimize '(= o2 o3) optimize-context)
+
+    ;;check sat
+    (z3::smt-check solver)
+    (z3::smt-check solver solver-context)
+
+    (z3::smt-check optimize)
+    (z3::smt-check optimize optimize-context)
+
+    ;;get model variables
+    (z3::smt-values solver '(s1))
+    (z3::smt-values solver '(s1) solver-context)
+
+    (z3::smt-values optimize '(o1))
+    (z3::smt-values optimize '(o1) optimize-context)
+    t))
+  
     
     

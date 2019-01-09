@@ -35,6 +35,10 @@
   :slots (context trace))
 
 (amino-ffi::def-foreign-container
+    z3-optimize z3-optimize-type
+  :slots (context trace))
+
+(amino-ffi::def-foreign-container
     z3-func-decl z3-func-decl-type)
 
 (amino-ffi::def-foreign-container

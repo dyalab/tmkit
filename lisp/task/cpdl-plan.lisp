@@ -106,10 +106,12 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
                               (case value
                                 (true `(assert ,name))
                                 (false `(assert (not ,name)))
-                                (otherwise `(assert (= ,name ,(cpd-mangle-fluent
+                                (otherwise (if (numberp value)
+					       `(assert (= ,name ,value))
+					       `(assert (= ,name ,(cpd-mangle-fluent
 							       domain
 							       value
-							       0))))))))
+							       0)))))))))
                  domain)
   (let ((non-bools (remove nil (map-cpd-fluent-types 'list
 					 (lambda (name type)
@@ -149,6 +151,14 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
            `(assert (transition ,@(map 'list (lambda (a)
                                                (cpd-mangle-transition domain (car a) step))
                                        args)))))
+
+(defun cpd-smt-encode-metric (function domain step)
+  "Encode the metric used for optimization"
+  (destructuring-ecase (constrained-domain-metric domain)
+    (((minimize |minimize| :minimize) &rest exp)
+       (funcall function `(minimize ,(cpd-mangle-exp domain exp step))))
+    (((maximize |maximize| :maximize) &rest exp)
+       (funcall function `(maximize ,(cpd-mangle-exp domain exp step))))))
 
 (defun cpd-smt-simple (domain steps)
   "Return the SMT encoding of the domain for STEPS count."
@@ -227,6 +237,7 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
   transition-args
   options
   eval-function
+  optimize
   k)
 
 (defun cpd-planner-eval (planner stmt)
@@ -255,12 +266,19 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
       (funcall #'add '(push 1))
       (cpd-smt-encode-goal #'add domain 0)
 
+      ;;add Optimization if defined
+      (if (eq (type-of solver) 'z3::z3-optimize)
+	  (cpd-smt-encode-metric #'add domain 0))
+	  
+      
+
       ;; Result
       (make-cpd-planner :domain domain
                         :solver solver
                         :transition-args args
                         :options options
                         :eval-function #'add
+			:optimize (eq (type-of solver) 'z3::z3-optimize)
                         :k 0))))
 
 (defun cpd-plan-next (planner)
@@ -299,6 +317,9 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
     ;; Push and assert goal
     (funcall add '(push 1))
     (cpd-smt-encode-goal add domain k)
+    ;;add Optimization if defined
+    (if (cpd-planner-optimize planner)
+	(cpd-smt-encode-metric add domain k))
 
     ;; Recurse
     (cpd-plan-next planner)))
@@ -306,7 +327,8 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
 
 (defun cpd-plan (domain &optional options)
   (let* ((options (or options (cpd-plan-options)))
-         (trace (cpd-plan-option options :trace)))
-    (z3::with-solver (solver :trace trace)
+         (trace (cpd-plan-option options :trace))
+	 (use-solver (null (constrained-domain-metric domain))))
+    (z3::choose-solver (use-solver solver :trace trace)
       (let ((planner (cpd-plan-init domain solver options)))
-        (cpd-plan-next planner)))))
+	(cpd-plan-next planner)))))

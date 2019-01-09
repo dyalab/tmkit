@@ -19,40 +19,136 @@
   (context z3-context-type)
   (handler :pointer))
 
+;;; Optimization
+(defcfun "Z3_mk_optimize" z3-optimize-type
+  (context z3-context-type))
+
+(defcfun "Z3_optimize_minimize" :unsigned-int
+  (context z3-context-type)
+  (optimize z3-optimize-type)
+  (ast z3-ast-type))
+
+(defcfun "Z3_optimize_maximize" :unsigned-int
+  (context z3-context-type)
+  (optimize z3-optimize-type)
+  (ast z3-ast-type))
+
+(defcfun ("Z3_optimize_inc_ref" %z3-optimize-inc-ref) :void
+  (context z3-context-type)
+  (optimize z3-optimize-type))
+
+(defcfun ("Z3_optimize_dec_ref" %z3-optimize-dec-ref) :void
+  (context z3-context-type)
+  (optimize z3-optimize-type))
+
+(defcfun ("Z3_optimize_push" %z3-optimize-push) :void
+  (context z3-context-type)
+  (optimize z3-optimize-type))
+
+(defcfun ("Z3_optimize_pop" %z3-optimize-pop) :void
+  (context z3-context-type)
+  (optimize z3-optimize-type)
+  (n :unsigned-int))
+
+(defcfun ("Z3_optimize_assert" %z3-optimize-assert) :void
+  (context z3-context-type)
+  (optimize z3-optimize-type)
+  (ast z3-ast-type))
+
+(defcfun ("Z3_optimize_check" %z3-optimize-check) z3-lbool
+  (context z3-context-type)
+  (optimize z3-optimize-type))
+
+(defcfun ("Z3_optimize_get_model" %z3-optimize-get-model) z3-model-type
+  (context z3-context-type)
+  (optimize z3-optimize-type))
+
+(defcfun "Z3_optimize_get_lower" z3-ast-type
+  (context z3-context-type)
+  (optimize z3-optimize-type)
+  (n :unsigned-int))
+
 ;;; Solver
 (defcfun "Z3_mk_solver" z3-solver-type
   (context z3-context-type))
 
-(defcfun "Z3_solver_inc_ref" :void
+(defcfun ("Z3_solver_inc_ref" %z3-solver-inc-ref) :void
   (context z3-context-type)
   (solver z3-solver-type))
 
-(defcfun "Z3_solver_dec_ref" :void
+(defcfun ("Z3_solver_dec_ref" %z3-solver-dec-ref) :void
   (context z3-context-type)
   (solver z3-solver-type))
 
-(defcfun "Z3_solver_push" :void
+(defcfun ("Z3_solver_push" %z3-solver-push) :void
   (context z3-context-type)
   (solver z3-solver-type))
 
-
-(defcfun "Z3_solver_pop" :void
+(defcfun ("Z3_solver_pop" %z3-solver-pop) :void
   (context z3-context-type)
   (solver z3-solver-type)
   (n :unsigned-int))
 
-(defcfun "Z3_solver_assert" :void
+(defcfun ("Z3_solver_assert" %z3-solver-assert) :void
   (context z3-context-type)
   (solver z3-solver-type)
   (ast z3-ast-type))
 
-(defcfun "Z3_solver_check" z3-lbool
+(defcfun ("Z3_solver_check" %z3-solver-check) z3-lbool
   (context z3-context-type)
   (solver z3-solver-type))
 
-(defcfun "Z3_solver_get_model" z3-model-type
+(defcfun ("Z3_solver_get_model" %z3-solver-get-model) z3-model-type
   (context z3-context-type)
   (solver z3-solver-type))
+
+;;;Wrapper functions to properly call either the optimizer or solver depending on type of solver
+(defun z3-solver-inc-ref (context solver)
+  (etypecase solver
+    (z3-optimize (%z3-optimize-inc-ref context solver))
+    (z3-solver (%z3-solver-inc-ref context solver))))
+
+(defun z3-solver-dec-ref (context solver)
+  (etypecase solver
+    (z3-optimize (%z3-optimize-dec-ref context solver))
+    (z3-solver (%z3-solver-dec-ref context solver))))
+
+(defun z3-solver-push (context solver)
+  (etypecase solver
+    (z3-optimize (%z3-optimize-push context solver))
+    (z3-solver (%z3-solver-push context solver))))
+
+(defun z3-solver-pop (context solver n)
+  (etypecase solver
+    (z3-optimize (%z3-optimize-pop context solver n))
+    (z3-solver (%z3-solver-pop context solver n))))
+
+(defun z3-solver-assert (context solver ast)
+  (etypecase solver
+    (z3-optimize (%z3-optimize-assert context solver ast))
+    (z3-solver (%z3-solver-assert context solver ast))))
+
+(defun z3-solver-check (context solver)
+  (etypecase solver
+    (z3-optimize (%z3-optimize-check context solver))
+    (z3-solver (%z3-solver-check context solver))))
+
+(defun z3-solver-get-model (context solver)
+  (etypecase solver
+    (z3-optimize (%z3-optimize-get-model context solver))
+    (z3-solver (%z3-solver-get-model context solver))))
+
+(defun z3-get-trace (solver)
+  (etypecase solver
+    (z3-solver (z3-solver-trace solver))
+    (z3-optimize (z3-optimize-trace solver))))
+
+(defun z3-get-context (solver)
+  (etypecase solver
+    (z3-solver (z3-solver-context solver))
+    (z3-optimize (z3-optimize-context solver))))
+
+;;;Model
 
 (defcfun "Z3_model_inc_ref" :void
   (context z3-context-type)
