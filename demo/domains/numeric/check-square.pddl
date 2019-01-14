@@ -1,0 +1,6 @@
+(define (problem check-square)
+     (:domain numeric)
+   (:objects a - num)
+   (:init (= a 2)
+   	  (can-square))
+   (:goal (and (= a 16))))

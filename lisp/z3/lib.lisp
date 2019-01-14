@@ -362,3 +362,6 @@
   (context z3-context-type)
   (numerator :int)
   (denominator :int))
+
+(defun z3-mk-float (context num)
+  (z3-mk-real context (truncate (* num 1000)) 1000))

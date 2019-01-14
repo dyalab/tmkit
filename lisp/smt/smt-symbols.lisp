@@ -60,6 +60,8 @@
 
    :=>
    :<=>
+   
+   :^
 
    :minimize
    :|minimize|

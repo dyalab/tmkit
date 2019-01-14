@@ -1,0 +1,25 @@
+(define (domain numeric)
+   (:action square
+   	    :parameters (?x - num ?y - square)
+	    :precondition (?y)
+	    :effect (and (= ?x (^ ?x 2))))
+   (:action sqrt
+   	    :parameters (?x - num ?y - sqrt)
+	    :precondition (?y)
+	    :effect (and (= ?x (^ ?x 0.5))))
+   (:action add
+   	    :parameters (?x ?y - num ?z - add)
+	    :precondition (?z)
+	    :effect (and (= ?x (+ ?x ?y))))
+   (:action subtract
+   	    :parameters (?x ?y - num ?z - subtract)
+	    :precondition (?z)
+	    :effect (and (= ?x (- ?x ?y))))
+   (:action multiply
+   	    :parameters (?x ?y - num ?z - multiply)
+	    :precondition (?z)
+	    :effect (and (= ?x (* ?x ?y))))
+   (:action divide
+   	    :parameters (?x ?y - num ?z - divide)
+	    :precondition (?z)
+	    :effect (and (= ?x (/ ?x ?y)))))

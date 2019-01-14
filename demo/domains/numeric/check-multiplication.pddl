@@ -1,0 +1,7 @@
+(define (problem check-multiplication)
+     (:domain numeric)
+   (:objects a b - num)
+   (:init (= a 2)
+   	  (= b 2)
+   	  (can-multiply))
+   (:goal (and (= a 8))))

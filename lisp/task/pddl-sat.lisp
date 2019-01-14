@@ -109,7 +109,9 @@
 (defun find-variables (exp var-tree)
   (cond
     ((eq exp nil)
-     nil)    
+     nil)
+    ((numberp exp)
+     nil)
     ((tree-map-find var-tree exp)
      (list exp))
     ((atom exp)
@@ -129,7 +131,7 @@
        (do-map (k v (ground-domain-variable-type ground))
 	 (if (eq v 'bool)
 	     (add `(declare-fluent ,k ,v))
-	     (add `(declare-fluent ,k int))))
+	     (add `(declare-fluent ,k real))))
        
        ;; Action variables
        (dolist (a (ground-domain-operators ground))

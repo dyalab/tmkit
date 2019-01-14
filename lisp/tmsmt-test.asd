@@ -8,4 +8,4 @@
                (:file "z3/test")
 	       (:file "test/test-path-checker-core")
 	       (:file "test/test-cpdl-core")
-               ))
+	       (:file "test/test-numeric-operations-core")))

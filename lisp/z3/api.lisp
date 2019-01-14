@@ -423,6 +423,7 @@
     (mod :binary #'z3-mk-mod)
     (rem :binary #'z3-mk-rem)
     (power :binary #'z3-mk-power)
+    (^ :binary #'z3-mk-power)
     (< :binary #'z3-mk-lt)
     (<= :binary #'z3-mk-le)
     (> :binary #'z3-mk-gt)
@@ -436,6 +437,8 @@
   (etypecase e
     (fixnum
      (z3-mk-int context e (z3-mk-int-sort context)))
+    (float
+     (z3-mk-float context e))
     (string (smt-app context e nil))
     (symbol
      (case e

@@ -1,0 +1,6 @@
+(define (problem check-sqrt)
+     (:domain numeric)
+   (:objects a - num)
+   (:init (= a 16)
+   	  (can-sqrt))
+   (:goal (and (= a 2))))

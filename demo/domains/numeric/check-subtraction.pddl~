@@ -1,0 +1,7 @@
+(define (problem check-addition)
+     (:domain numeric)
+   (:objects a b - num)
+   (:init (= a 0)
+   	  (= b 1)
+   	  (can-add))
+   (:goal (and (= a 5))))

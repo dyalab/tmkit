@@ -1,0 +1,6 @@
+(define (problem set-to-five)
+     (:domain numeric)
+   (:objects a - num)
+   (:init (= a 2)
+   	  (is-num a))
+   (:goal (and (= a 8))))

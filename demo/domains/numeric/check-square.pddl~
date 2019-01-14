@@ -1,0 +1,7 @@
+(define (problem check-division)
+     (:domain numeric)
+   (:objects a b - num)
+   (:init (= a 8)
+   	  (= b 2)
+   	  (can-divide))
+   (:goal (and (= a 2))))

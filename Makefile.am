@@ -241,3 +241,7 @@ test_path_checker_SOURCES = test/test_path_checker.c
 TESTS += test_cpdl
 noinst_PROGRAMS += test_cpdl
 test_cpdl_SOURCES = test/test_cpdl.c
+
+TESTS += test_numeric_operations
+noinst_PROGRAMS += test_numeric_operations
+test_numeric_operations_SOURCES = test/test_numeric_operations.c
