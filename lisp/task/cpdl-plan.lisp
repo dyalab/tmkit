@@ -137,13 +137,18 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
 	 (in-start (gethash name1 start-hash) name2 start-hash)))))
 
 				      
-(defun cpd-smt-encode-goal (function domain step)
-  "Encode the goal state at STEP"
-  (map-cpd-goals nil
-                 (lambda (c)
-                   (check-type c list)
-                   (funcall function `(assert ,(cpd-mangle-exp domain c step))))
-                 domain))
+;; (defun cpd-smt-encode-goal (function domain step)
+;;   "Encode the goal state at STEP"
+;;   (map-cpd-goals nil
+;;                  (lambda (c)
+;;                    (check-type c list)
+;;                    (funcall function `(assert ,(cpd-mangle-exp domain c step))))
+;;                  domain))
+(defun cpd-smt-encode-goal (function domain goal step)
+  (funcall function `(assert ,(cpd-mangle-exp domain goal step))))
+
+(defun cpd-smt-encode-probabilistic-goal (function domain goal step)
+      (funcall function `(maximize ,(cpd-mangle-exp domain goal step))))
 
 (defun cpd-smt-encode-transition (function domain args step)
   "Encode the call to transition function at STEP"
@@ -171,7 +176,7 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
     (cpd-smt-encode-start #'add domain)
 
     ;; goal
-    (cpd-smt-encode-goal #'add domain steps)
+    (cpd-smt-encode-goal #'add domain (car (constrained-domain-goal-clauses domain)) steps)
 
     ;; transitions
     (multiple-value-bind (fun args)
@@ -201,6 +206,23 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
          (values (z3::smt-eval solver `(get-value ,symbols))))
     (loop for (a . b) in values
        collect (cons (cpd-unmangle domain a) b))))
+
+(defun cpd-get-confidence (planner)
+  (let* ((k (cpd-planner-k planner))
+	 (domain (cpd-planner-domain planner))
+	 (solver (cpd-planner-solver planner))
+	 (goal-exp (car (cpd-planner-remaining-goals planner)))
+	 (goal-vars (with-collected (add)
+		      (check-exp (lambda (var)
+				   (add (cpd-mangle-exp domain var k)))
+				 goal-exp)))
+	 (values (z3::smt-eval solver `(get-value ,goal-vars)))
+	 (goal-values (loop for (a . b) in values
+			 collect (list (cdr (cpd-unmangle domain a)) b))))
+    (loop for (exp val) in goal-values
+     do (nsubst val exp goal-exp :test 'equal))
+    (eval goal-exp)))
+  
 
 
 
@@ -238,13 +260,37 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
   options
   eval-function
   optimize
-  k)
+  k
+  remaining-goals
+  added-goals
+  backtracking
+  probability-confidence)
 
 (defun cpd-planner-eval (planner stmt)
   (funcall (cpd-planner-eval-function planner) stmt))
 
 (defun cpd-planner-max-steps (planner)
   (cpd-plan-option (cpd-planner-options planner) :max-steps))
+
+(defun cpd-planner-increment-goal (planner)
+  (let ((k (cpd-planner-k planner))
+	(add (cpd-planner-eval-function planner)))
+    (push (cons (pop (cpd-planner-remaining-goals planner)) k)
+	  (cpd-planner-added-goals planner))
+    (funcall add '(push 1))))
+
+(defun cpd-planner-decrement-goal (planner)
+  (let ((add (cpd-planner-eval-function planner)))
+    (destructuring-bind (goal . step)
+	(pop (cpd-planner-added-goals planner))
+      (funcall add '(pop 1))
+      (setf (cpd-planner-k planner) (+ step 1))
+      (push goal (cpd-planner-remaining-goals planner))
+      (setf (cpd-planner-backtracking planner) t)
+      (if (and (cpd-planner-added-goals planner)
+	       (>= step (cpd-planner-max-steps planner)))
+	  (cpd-planner-decrement-goal planner)))))    
+  
 
 (defun cpd-plan-init (domain solver &optional options)
   "Initialize the planner."
@@ -264,10 +310,11 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
 
       ;; Push and Assert Goal
       (funcall #'add '(push 1))
-      (cpd-smt-encode-goal #'add domain 0)
+
+      (cpd-smt-encode-goal #'add domain (car (constrained-domain-goal-clauses domain)) 0)
 
       ;;add Optimization if defined
-      (if (eq (type-of solver) 'z3::z3-optimize)
+      (if (constrained-domain-metric domain)
 	  (cpd-smt-encode-metric #'add domain 0))
 	  
       
@@ -278,8 +325,11 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
                         :transition-args args
                         :options options
                         :eval-function #'add
-			:optimize (eq (type-of solver) 'z3::z3-optimize)
-                        :k 0))))
+			:optimize (constrained-domain-metric domain)
+                        :k 0
+			:remaining-goals (constrained-domain-goal-clauses domain)
+			:added-goals nil
+			:backtracking nil))))
 
 (defun cpd-plan-next (planner)
   (let ((k (cpd-planner-k planner))
@@ -288,35 +338,70 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
     (let ((is-sat (cpd-planner-eval planner '(check-sat))))
       (cond
         ((eq is-sat :sat)
-         ;; SAT, get result
-         (values (cpd-plan-result (cpd-planner-domain planner)
-                                  (cpd-planner-solver planner)
-                                  k)
-                 t
-                 planner))
+	 ;; sat
+	 (cpd-planner-increment-goal planner)
+	 (cond
+	   ((null (cpd-planner-remaining-goals planner))
+	     ;; No more goal states to get. Return result.
+	     (values (cpd-plan-result (cpd-planner-domain planner)
+				      (cpd-planner-solver planner)
+				      k)
+		     t
+		     planner))
+	   (t
+	    ;; More goal states to check. Assert next goal state.
+	     (cpd-smt-encode-goal (cpd-planner-eval-function planner)
+				  (cpd-planner-domain planner)
+				  (car (cpd-planner-remaining-goals planner)) k)
+	     (cpd-plan-next planner))))
+	((eq is-sat :unknown)
+	 ;; Z3 can't solve it, return reason why.
+	 (format *error-output* "Unknown reason: ~S ~%" (z3::z3-get-reason-unknown
+							 (z3::z3-get-context
+							  (cpd-planner-solver planner))
+							 (cpd-planner-solver planner)))
+	 (values nil nil planner))
         ((< k max-steps)
          ;; UNSAT: Step
          (incf (cpd-planner-k planner))
          (cpd-plan-step planner))
-        ;; Over max steps, fail
-        (t (values nil nil planner))))))
+        
+        (t
+	 ;; Over max steps
+	 (cond
+	   ((null (cpd-planner-added-goals planner))
+	    ;; No goals to remove, Fail.
+	    (values nil nil planner))
+	   (t
+	    ;; Goals were added. Revert back to previous timestep
+	    (cpd-planner-decrement-goal planner)
+	    (if (and (null (cpd-planner-added-goals planner))
+		     (>= (cpd-planner-k planner) max-steps))
+		(values nil nil planner)		     
+		(cpd-plan-step planner)))))))))
 
 
 (defun cpd-plan-step (planner)
   (let ((k (cpd-planner-k planner))
         (add (cpd-planner-eval-function planner))
         (domain (cpd-planner-domain planner))
-        (args (cpd-planner-transition-args planner)))
+        (args (cpd-planner-transition-args planner))
+	(goal (car (cpd-planner-remaining-goals planner)))
+	(backtracking (cpd-planner-backtracking planner)))
     (format *error-output* "~&Unrolling at step ~D...~%" k)
 
     ;; Pop, declare fluents and assert transition
     (funcall add '(pop 1))
-    (cpd-smt-encode-fluents add domain k)
+    (if (not backtracking) (cpd-smt-encode-fluents add domain k))
+
     (cpd-smt-encode-transition add domain args (1- k))
+	
 
     ;; Push and assert goal
     (funcall add '(push 1))
-    (cpd-smt-encode-goal add domain k)
+
+    (cpd-smt-encode-goal add domain goal k)
+    
     ;;add Optimization if defined
     (if (cpd-planner-optimize planner)
 	(cpd-smt-encode-metric add domain k))
@@ -328,7 +413,7 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
 (defun cpd-plan (domain &optional options)
   (let* ((options (or options (cpd-plan-options)))
          (trace (cpd-plan-option options :trace))
-	 (use-solver (null (constrained-domain-metric domain))))
-    (z3::choose-solver (use-solver solver :trace trace)
+	 (use-optimizer (constrained-domain-metric domain)))
+    (z3::choose-solver (use-optimizer solver :trace trace)
       (let ((planner (cpd-plan-init domain solver options)))
 	(cpd-plan-next planner)))))

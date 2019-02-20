@@ -1,0 +1,11 @@
+(define (domain sequential)
+	(:predicates (first)
+		     (second))
+	(:action set-first
+		 :parameters
+		 :precondition (not (first))
+		 :effect (first))
+	(:action set-second
+		 :parameters
+		 :precondition (not (first))
+		 :effect (second)))

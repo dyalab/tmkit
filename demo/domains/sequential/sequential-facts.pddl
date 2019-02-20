@@ -1,0 +1,5 @@
+(define (problem ordering)
+	(:domain sequential)
+	(:init)
+	(:goal ((first)
+		(second))))

@@ -115,7 +115,9 @@
                  (symbol
                   (assoc-value-default e alist :test #'eq :default e))
                  (cons
-                  (map 'list (lambda (e) (rec e alist)) e)))))
+                  (map 'list (lambda (e) (rec e alist)) e))
+		 (number
+		  e))))
       (rec (pddl-derived-body derived)
            (arg-alist (pddl-derived-arguments derived)
                       actual-args))))
@@ -205,10 +207,31 @@
        collect
          (destructuring-case exp
            ((not x) x)
-           ((= x y) x) ;; TODO: add assertion
+           ((= x y) (declare (ignore y)) x) ;; TODO: add assertion
            ((t &rest rest) (declare (ignore rest))
             exp)))))
 
+(defun ground-action-modified-true (action)
+  (destructuring-bind (-and &rest things) (ground-action-effect action)
+    (check-symbol -and 'and)
+    (reduce (lambda (ret exp)
+	      (if (or (eq (car exp) '=)
+		      (eq (car exp) 'not))
+		  ret
+		  (cons exp ret)))
+	    things
+	    :initial-value nil)))
+
+
+(defun ground-action-modified-false (action)
+  (destructuring-bind (-and &rest things) (ground-action-effect action)
+    (check-symbol -and 'and)
+    (reduce (lambda (ret exp)
+	      (if (eq (car exp) 'not)
+		  (cons (cadr exp) ret)
+		  ret))
+	    things
+	    :initial-value nil)))
 
 
 (defstruct ground-domain
@@ -223,6 +246,7 @@
   (start nil :type list)
   (goal nil :type list)
   (metric nil :type list)
+  probability-threshold
   action-encoding)
 
 (defun type-map-keys (map)
@@ -292,7 +316,8 @@
 			   collect g))
 	     (initial-false (set-difference  bool-vars
 					     (collect-variables initial-true ground-variables)
-					     :test #'equal)))
+					     :test #'equal))
+	     (goal (or goal (pddl-facts-goal facts))))
 	(make-ground-domain :variables full-ground-variables
 			    :variable-type full-variable-type
 			    :derived-variables (type-map-keys derived-type)
@@ -304,8 +329,11 @@
 			    :action-encoding action-encoding
 			    :start  `(and ,@initial-true
 					  ,@(loop for v in initial-false collect `(not ,v)))
-			    :goal (or goal (pddl-facts-goal facts))
-			    :metric (pddl-facts-metric facts))))))
+			    :goal (if (consp (car goal))
+				      goal
+				      (list goal))
+			    :metric (pddl-facts-metric facts)
+			    :probability-threshold (pddl-facts-probability-threshold facts))))))
 
 (defun smt-frame-axioms-exp (state-vars ground-actions i j action-encoding)
   ;(print ground-operators)

@@ -76,7 +76,8 @@
   type-map
   init
   goal
-  metric)
+  metric
+  probability-threshold)
 
 ;; TYPE QUERIES
 ;; Given: argument type, objects and type
@@ -351,7 +352,9 @@ RETURNS: (VALUES pddl-sexp (or :domain :problem))"
                  goal))
 	  ((:metric metric)
 	   (setf (pddl-facts-metric facts)
-		 metric))))
+		 metric))
+	  ((:probability-threshold arg)
+	   (setf (pddl-facts-probability-threshold facts) arg))))
       facts)))
 
 (defun pddl-exp-rope (exp)

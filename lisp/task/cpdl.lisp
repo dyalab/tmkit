@@ -61,6 +61,10 @@
   ;;function to optimize for (if any)
   metric
 
+  ;;Threshold to determine if a given probability is considered true.
+  ;;If populated, builds a probability function for the transition and goal clauses.
+  probability-threshold
+
   ;; Caches
 
   ;; sexp -> mangled
@@ -159,7 +163,9 @@
 (defun eval-cpdl (cpd stmt)
   (destructuring-ecase stmt
     ((declare-fluent name  &optional (type 'bool))
-     (cpdl-declare-fluent cpd name type))
+     (if (constrained-domain-probability-threshold cpd)
+	 (cpdl-declare-fluent cpd name 'real)
+	 (cpdl-declare-fluent cpd name type)))
     ((start thing)
      (flet ((add-start (fluent value)
 		(let ((fluent (ensure-list fluent))
@@ -170,7 +176,13 @@
                 (let ((hash (constrained-domain-start-map cpd)))
                   (when (hash-table-contains fluent hash)
                     (cpdl-error "Start value already declared: ~A" fluent))
-                  (setf (gethash fluent hash) value)))))
+		  (cond
+		    ((and (constrained-domain-probability-threshold cpd) (eq 'true value))
+		     (setf (gethash fluent hash) 1))
+		    ((and (constrained-domain-probability-threshold cpd) (eq 'false value))
+		     (setf (gethash fluent hash) 0))
+		    (t	      
+		     (setf (gethash fluent hash) value)))))))
        (if (consp thing)
            (destructuring-case thing
              ((not fluent)
@@ -184,13 +196,19 @@
            (add-start thing 'true))))
     ((goal clause)
      ;; TODO: check exp
-     (push (cpd-canonize-exp cpd clause)
-           (constrained-domain-goal-clauses cpd)))
+       (if (null (constrained-domain-goal-clauses cpd))
+	   (push (cpd-canonize-exp cpd clause)
+		 (constrained-domain-goal-clauses cpd))
+	 (push (cpd-canonize-exp cpd clause)
+	       (cdr (last (constrained-domain-goal-clauses cpd))))))
 
     ((transition clause)
      ;; TODO: check exp
-     (push (cpd-canonize-exp cpd clause)
-           (constrained-domain-transition-clauses cpd)))
+     (if (constrained-domain-probability-threshold cpd)
+	 (push (s-exp->probability (cpd-canonize-exp cpd clause))
+	       (constrained-domain-transition-clauses cpd))
+	 (push (cpd-canonize-exp cpd clause)
+	       (constrained-domain-transition-clauses cpd))))
 
     ((output fluent)
      (let ((fluent (cpd-canonize-fluent cpd fluent)))
@@ -198,7 +216,9 @@
        (push fluent (constrained-domain-outputs cpd))))
     ((metric clause)
      (assert (null (constrained-domain-metric cpd)))
-     (setf (constrained-domain-metric cpd) clause)))
+     (setf (constrained-domain-metric cpd) clause))
+    ((probability-threshold clause)
+     (setf (constrained-domain-probability-threshold cpd) clause)))
   ;; Result
   cpd)
 
@@ -260,29 +280,35 @@
                   (lambda (c) `(goal ,c))
                   cpd)))
 
-(defun s-exp->probability (exp)
+(defun s-exp->probability (exp &key (if-symb 'ite))
   (destructuring-bind (op &rest args)
       exp
     (case op
       (and (cons '* (loop for x in args
-		       collect (s-exp->probability x))))
+		       collect (s-exp->probability x :if-symb if-symb))))
       (or (append '(- 1) (list (cons '* (loop for x in args
-					   collect `(- 1 ,(s-exp->probability x)))))))
-      (not `(- 1 ,(s-exp->probability (car args))))
+					   collect `(- 1 ,(s-exp->probability x
+									      :if-symb if-symb)))))))
+      (not `(- 1 ,(s-exp->probability (car args) :if-symb if-symb)))
       (=> (destructuring-bind (a b)
 	      args
-	    (let ((a (s-exp->probability a))
-		  (b (s-exp->probability b)))
+	    (let ((a (s-exp->probability a :if-symb if-symb))
+		  (b (s-exp->probability b :if-symb if-symb)))
 	      `(- 1 (* ,a (- 1 (* ,a ,b)))))))
       (<=> (destructuring-bind (a b)
 	       args
-	     (let ((a (s-exp->probability a))
-		   (b (s-exp->probability b)))
+	     (let ((a (s-exp->probability a :if-symb if-symb))
+		   (b (s-exp->probability b :if-symb if-symb)))
 	       `(* (- 1 (* ,a (- 1 (* ,a ,b))))
 		   (- 1 (* ,b (- 1 (* ,b ,a))))))))
       (xor (destructuring-bind (a b)
 	       args
-	     (let ((a (s-exp->probability a))
-		   (b (s-exp->probability b)))
-	     `(* (- 1 (* ,a ,b)) (- 1 (* (- 1 ,a) (-1 ,b)))))))
+	     (let ((a (s-exp->probability a :if-symb if-symb))
+		   (b (s-exp->probability b :if-symb if-symb)))
+	       `(* (- 1 (* ,a ,b)) (- 1 (* (- 1 ,a) (-1 ,b)))))))
+      (= (destructuring-bind (a b)
+	     args
+	   (let ((a (s-exp->probability a :if-symb if-symb))
+		 (b (s-exp->probability b :if-symb if-symb)))
+	     `(,if-symb (= ,a ,b) 1 0))))
       (otherwise exp))))

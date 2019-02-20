@@ -4,7 +4,7 @@
 
 int main(int argc, char* argv[]){
   int status;
-  status=system("sbcl --noinform --disable-debugger --load ./test/test-cpdl.lisp");
+  status=system("sbcl --noinform --disable-debugger --load ./test/test-feedback.lisp");
   assert(status==0);
   return 0;
     }

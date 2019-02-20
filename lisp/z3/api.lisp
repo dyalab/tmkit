@@ -70,8 +70,8 @@
           (z3-optimize-trace solver) trace)
     solver))
 
-(defmacro choose-solver ((use-solver solver &key trace) &body body)
-  `(if ,use-solver
+(defmacro choose-solver ((use-optimizer solver &key trace) &body body)
+  `(if ,(null use-optimizer)
       (with-solver (,solver :trace ,trace)
 	 ,@body)
       (with-optimizer (,solver :trace ,trace)
@@ -344,9 +344,9 @@
                (null (cdddr args)))
     (error "Wanted three arguments: ~A" args) )
   (z3-mk-ite context
-             (smt->ast (first args) context)
-             (smt->ast (second args) context)
-             (smt->ast (third args) context)))
+             (smt->ast context (first args))
+             (smt->ast context (second args))
+             (smt->ast context (third args))))
 
 (defun smt-app-macro (context op definition args)
   (let ((body (smt-definition-body definition))
@@ -519,6 +519,13 @@
       (assert (eq :true r)) ;; TODO: handle other cases
       (mem-ref i :int))))
 
+(defun smt-value-real (context ast)
+  (with-foreign-object (num :int64)
+    (with-foreign-object (den :int64)
+      (let ((r (z3-get-numeral-rational-int64 context ast num den)))
+	(assert (eq :true r))
+	(/ (mem-ref num :int64) (mem-ref den :int64))))))
+
 (defun model-value (context model thing)
   (declare (type z3-context context))
   (let* ((ent  (smt-lookup context thing))
@@ -534,7 +541,9 @@
             (:int
              (smt-value-int context a))
             (:bool
-             (z3-get-bool-value context a)))))))
+             (z3-get-bool-value context a))
+	    (:real
+	     (smt-value-real context a)))))))
 
 
 

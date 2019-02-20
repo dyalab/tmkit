@@ -57,7 +57,9 @@
 
 (defcfun ("Z3_optimize_check" %z3-optimize-check) z3-lbool
   (context z3-context-type)
-  (optimize z3-optimize-type))
+  (optimize z3-optimize-type)
+  (n :unsigned-int)
+  (ast :pointer))
 
 (defcfun ("Z3_optimize_get_model" %z3-optimize-get-model) z3-model-type
   (context z3-context-type)
@@ -67,6 +69,10 @@
   (context z3-context-type)
   (optimize z3-optimize-type)
   (n :unsigned-int))
+
+(defcfun "Z3_optimize_get_reason_unknown" :string
+  (context z3-context-type)
+  (optimize z3-optimize-type))
 
 ;;; Solver
 (defcfun "Z3_mk_solver" z3-solver-type
@@ -102,6 +108,10 @@
   (context z3-context-type)
   (solver z3-solver-type))
 
+(defcfun "Z3_solver_get_reason_unknown" :string
+  (context z3-context-type)
+  (optimize z3-solver-type))
+
 ;;;Wrapper functions to properly call either the optimizer or solver depending on type of solver
 (defun z3-solver-inc-ref (context solver)
   (etypecase solver
@@ -130,7 +140,7 @@
 
 (defun z3-solver-check (context solver)
   (etypecase solver
-    (z3-optimize (%z3-optimize-check context solver))
+    (z3-optimize (%z3-optimize-check context solver 0 (null-pointer)))
     (z3-solver (%z3-solver-check context solver))))
 
 (defun z3-solver-get-model (context solver)
@@ -147,6 +157,11 @@
   (etypecase solver
     (z3-solver (z3-solver-context solver))
     (z3-optimize (z3-optimize-context solver))))
+
+(defun z3-get-reason-unknown (context solver)
+  (etypecase solver
+    (z3-solver (z3-solver-get-reason-unknown context solver))
+    (z3-optimize (z3-optimize-get-reason-unknown context solver))))
 
 ;;;Model
 
@@ -332,6 +347,12 @@
   (context z3-context-type)
   (a z3-ast-type)
   (i :pointer))
+
+(defcfun "Z3_get_numeral_rational_int64" z3-lbool
+  (context z3-context-type)
+  (a z3-ast-type)
+  (num :pointer)
+  (den :pointer))
 
 ;;; Model
 

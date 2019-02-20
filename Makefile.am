@@ -245,3 +245,11 @@ test_cpdl_SOURCES = test/test_cpdl.c
 TESTS += test_numeric_operations
 noinst_PROGRAMS += test_numeric_operations
 test_numeric_operations_SOURCES = test/test_numeric_operations.c
+
+TESTS += test_sequential
+noinst_PROGRAMS += test_sequential
+test_sequential_SOURCES = test/test_sequential.c
+
+TESTS += test_feedback
+noinst_PROGRAMS += test_feedback
+test_feedback_SOURCES = test/test_feedback.c

@@ -8,4 +8,6 @@
                (:file "z3/test")
 	       (:file "test/test-path-checker-core")
 	       (:file "test/test-cpdl-core")
-	       (:file "test/test-numeric-operations-core")))
+	       (:file "test/test-numeric-operations-core")
+	       (:file "test/test-sequential-core")
+	       (:file "test/test-feedback-core")))
