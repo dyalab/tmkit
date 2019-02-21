@@ -137,13 +137,6 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
 	 (in-start (gethash name1 start-hash) name2 start-hash)))))
 
 				      
-;; (defun cpd-smt-encode-goal (function domain step)
-;;   "Encode the goal state at STEP"
-;;   (map-cpd-goals nil
-;;                  (lambda (c)
-;;                    (check-type c list)
-;;                    (funcall function `(assert ,(cpd-mangle-exp domain c step))))
-;;                  domain))
 (defun cpd-smt-encode-goal (function domain goal step)
   (funcall function `(assert ,(cpd-mangle-exp domain goal step))))
 
@@ -263,8 +256,7 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
   k
   remaining-goals
   added-goals
-  backtracking
-  probability-confidence)
+  backtracking)
 
 (defun cpd-planner-eval (planner stmt)
   (funcall (cpd-planner-eval-function planner) stmt))

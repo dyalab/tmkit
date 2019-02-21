@@ -154,7 +154,7 @@
        (do-map (k v (ground-domain-variable-type ground))
 	 (if (eq v 'bool)
 	     (add `(declare-fluent ,k ,v))
-	     (add `(declare-fluent ,k real))))
+	     (add `(declare-fluent ,k int))))
        
        ;; Action variables
        (dolist (a (ground-domain-operators ground))
