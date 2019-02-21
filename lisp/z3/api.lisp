@@ -70,8 +70,8 @@
           (z3-optimize-trace solver) trace)
     solver))
 
-(defmacro choose-solver ((use-optimizer solver &key trace) &body body)
-  `(if ,(null use-optimizer)
+(defmacro choose-solver ((solver use-solver &key trace) &body body)
+  `(if ,use-solver
       (with-solver (,solver :trace ,trace)
 	 ,@body)
       (with-optimizer (,solver :trace ,trace)
