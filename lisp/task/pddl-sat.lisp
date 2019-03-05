@@ -112,7 +112,9 @@
 								       (replace-axiom
 									(ground-action-effect b)
 									axioms) variable-type-tree))))
-                            collect `(not ,(fluent-now op-b))))))))
+				 collect `(not ,(fluent-now op-b))))))))
+      (add (cons 'or (loop for op-exp in action-fluents
+		      collect `(now ,op-exp))))
       
       ;; frame
       (map nil #'add (pddl-sat-frame ground)))))
@@ -152,14 +154,14 @@
        
        ;; State variables
        (do-map (k v (ground-domain-variable-type ground))
-	 (if (eq v 'bool)
+	 (if (is-bool v)
 	     (add `(declare-fluent ,k ,v))
-	     (add `(declare-fluent ,k real))))
+	     (add `(declare-fluent ,k |Real|))))
        
        ;; Action variables
        (dolist (a (ground-domain-operators ground))
 	 (let ((a (pddl-sat-op a)))
-	   (add `(declare-fluent ,a bool))
+	   (add `(declare-fluent ,a |Bool|))
 	   (add `(output ,a))))
        
        ;; Start

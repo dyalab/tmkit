@@ -186,7 +186,7 @@ RETURNS: (VALUES pddl-sexp (or :domain :problem))"
     (let* ((name (pddl-operators-intern ops :predicate name))
            (type-list (parse-typed-list arg-list)))
       (make-pddl-function :name name
-                          :type 'bool
+                          :type '|Bool|
                           :arguments type-list))))
 
 (defun parse-pddl-functions (ops sexp)

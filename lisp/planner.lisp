@@ -312,7 +312,7 @@
         (ground-derived type-objects (pddl-operators-derived operators))
       (let* ((initial-true (replace-axiom (pddl-facts-init facts) derived-axioms))
 	     (bool-vars (loop for g in ground-variables
-			   when (eq 'bool (tree-map-find variable-type g))
+			   when (is-bool (tree-map-find variable-type g))
 			   collect g))
 	     (initial-false (set-difference  bool-vars
 					     (collect-variables initial-true ground-variables)

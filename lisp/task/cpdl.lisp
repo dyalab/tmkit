@@ -30,6 +30,21 @@
 (defun cpdl-error (fmt &rest args)
   (apply #'error fmt args))
 
+(defun is-bool (type)
+  (or (eq type 'bool)
+      (eq type '|Bool|)
+      (eq type :bool)))
+
+(defun is-int (type)
+  (or (eq type 'int)
+      (eq type '|Int|)
+      (eq type :int)))
+
+(defun is-real (type)
+  (or (eq type 'real)
+      (eq type '|Real|)
+      (eq type :real)))
+
 
 (defstruct fluent-descriptor
   name

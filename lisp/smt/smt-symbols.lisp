@@ -35,6 +35,9 @@
    :int
    :|Int|
 
+   :real
+   :|Real|
+
    :push
    :|push|
 
@@ -68,4 +71,10 @@
 
    :maximize
    :|maximize|
+
+   :now
+   :|now|
+
+   :next
+   :|next|
    ))

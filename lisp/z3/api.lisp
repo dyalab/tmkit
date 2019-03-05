@@ -91,7 +91,37 @@
 
 (defun smt-trace (solver thing)
   (when-let (trace (z3-get-trace solver))
-    (format trace "~&~A" thing)))
+    (cond ((or (eq (car thing) 'declare-const)
+		    (eq (car thing) '|declare-const|)
+		    (eq (car thing) :declare-const))
+	   (format t "~&~A" thing))
+	  
+	  ((eq (car thing) '|define-fun|)
+	   (format t "~&~A" (pretty-print-transition thing)))
+	  ((eq (car thing) 'get-value)
+	   (format nil ""))
+	  (t
+	   (let ((*print-case* :downcase))
+	     (format trace "~&~A" thing))))))
+
+
+(defun pretty-print-transition (exp)
+  (labels ((print-now (exp)
+	     (format nil "now_~{~A~^_~}" exp))
+	   (print-next (exp)
+	     (format nil "next_~{~A~^_~}" exp))
+	   (recurse (exp)
+	     (loop for e in exp
+		collect (cond
+			  ((not (consp e))
+			   e)
+			  ((eq (car e) 'now)
+			   (print-now (cadr e)))
+			  ((eq (car e) 'next)
+			   (print-next (cadr e)))
+			  (t
+			   (recurse e))))))
+    (recurse (subst '|not| 'not (subst '|or| 'or (subst '|and| 'and exp))))))
 
 (defun smt-normalize-id (key)
   (etypecase key
@@ -305,7 +335,7 @@
            (type function function)
            (type list args))
   (unless (and args
-               (null (cdr args)))
+               (null (cdr args)))	
     (error "Wanted one argument: ~A" args) )
   (funcall function context (smt->ast context (car args))))
 

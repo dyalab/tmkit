@@ -28,7 +28,8 @@
   (:action put-down
            :parameters (?x - block ?loc - location)
            :precondition (and (holding ?x)
-                              (clear ?loc))
+                              (clear ?loc)
+			      (not (handempty)))
            :effect (and (not (holding ?x))
                         (handempty)
                         (clear ?x)
@@ -36,7 +37,9 @@
                         (not (clear ?loc))))
   (:action stack
            :parameters (?x - block ?y - block)
-           :precondition (and (holding ?x) (clear ?y))
+           :precondition (and (holding ?x)
+	   		      (clear ?y)
+			      (not (handempty)))
            :effect (and (not (holding ?x))
                         (handempty)
                         (not (clear ?y))

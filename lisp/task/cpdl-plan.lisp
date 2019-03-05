@@ -1,6 +1,6 @@
 (in-package :tmsmt)
 
-(defparameter +cpd-transition-name+ 'transition)
+(defparameter +cpd-transition-name+ '|transition|)
 
 (declaim (ftype (function (constrained-domain list fixnum) string)
                 cpd-mangle-fluent))
@@ -81,7 +81,7 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
                                       domain))
          (args (append nows nexts)))
     (values
-     `(define-fun ,+cpd-transition-name+ ,args bool
+     `(|define-fun| ,+cpd-transition-name+ ,args |Bool|
                   ,f)
      args)))
 
@@ -93,7 +93,7 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
   (map-cpd-fluent-types nil
                         (lambda (name type)
                           (funcall function
-                                   `(declare-const ,(cpd-mangle-fluent domain name step)
+                                   `(|declare-const| ,(cpd-mangle-fluent domain name step)
                                                    ,type)))
                         domain))
 
@@ -115,7 +115,7 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
                  domain)
   (let ((non-bools (remove nil (map-cpd-fluent-types 'list
 					 (lambda (name type)
-					   (if (not (eq type 'bool))
+					   (if (not (is-bool type))
 					       name))
 					 domain))))
     (dolist (name1 non-bools)
@@ -146,7 +146,7 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
 (defun cpd-smt-encode-transition (function domain args step)
   "Encode the call to transition function at STEP"
   (funcall function
-           `(assert (transition ,@(map 'list (lambda (a)
+           `(assert (,+cpd-transition-name+ ,@(map 'list (lambda (a)
                                                (cpd-mangle-transition domain (car a) step))
                                        args)))))
 
