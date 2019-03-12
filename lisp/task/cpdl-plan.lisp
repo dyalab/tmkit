@@ -99,6 +99,7 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
 
 (defun cpd-smt-encode-start (function domain)
   "Encode the start state"
+  (funcall function '(push 1))
   (map-cpd-start nil
                  (lambda (name value)
                    (let ((name (cpd-mangle-fluent domain name 0)))
@@ -335,17 +336,17 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
 	 (cond
 	   ((null (cpd-planner-remaining-goals planner))
 	     ;; No more goal states to get. Return result.
-	     (values (cpd-plan-result (cpd-planner-domain planner)
-				      (cpd-planner-solver planner)
-				      k)
-		     t
-		     planner))
+	    (values (cpd-plan-result (cpd-planner-domain planner)
+				     (cpd-planner-solver planner)
+				     k)
+		    t
+		    planner))
 	   (t
 	    ;; More goal states to check. Assert next goal state.
-	     (cpd-smt-encode-goal (cpd-planner-eval-function planner)
-				  (cpd-planner-domain planner)
-				  (car (cpd-planner-remaining-goals planner)) k)
-	     (cpd-plan-next planner))))
+	    (cpd-smt-encode-goal (cpd-planner-eval-function planner)
+				 (cpd-planner-domain planner)
+				 (car (cpd-planner-remaining-goals planner)) k)
+	    (cpd-plan-next planner))))
 	((eq is-sat :unknown)
 	 ;; Z3 can't solve it, return reason why.
 	 (format *error-output* "Unknown reason: ~S ~%" (z3::z3-get-reason-unknown
