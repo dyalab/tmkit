@@ -54,7 +54,7 @@
 			 (pddl-operators-derived op))
      if (eq (pddl-function-type x) '|Bool|)
      collect (pddl-function-name x)))
-  
+
 
 (defun find-and-replace-probabilities (operators facts thresh)
   (let* ((func-names (collect-bool-function-names operators))
@@ -62,7 +62,7 @@
 	 (start-hash (make-hash-table :test 'equal))
 	 (bool-init (reduce (lambda (ret var)
 			      (destructuring-case var
-				((= &rest args)				   
+				((= &rest args)
 				 (assert (and (cdr args) (null (cddr args))))
 				 (let ((f (car args))
 				       (val (cadr args)))
@@ -105,15 +105,15 @@
 	 (action-fluents (map 'list #'pddl-sat-op action-list))
 	 (true-hash (make-hash-table :test #'equal))
 	 (false-hash (make-hash-table :test #'equal)))
-      
+
       (loop for a in action-list
 	 for op-exp in action-fluents
-	 do (progn	      
+	 do (progn
 	      (dolist (v (ground-action-modified-true a))
 		(setf (gethash v true-hash) (cons op-exp (gethash v true-hash))))
 	      (dolist (v (ground-action-modified-false a))
 		(setf (gethash v false-hash) (cons op-exp (gethash v false-hash))))))
-      
+
       (loop for v in variables
 	 collect (let* ((true-clause (gethash v true-hash))
 			(false-clause (gethash v false-hash))
@@ -141,8 +141,8 @@
      if (eq performed :true)
      collect (cpd-mangle-fluent domain
 				(cdr action) (car action))))
-    
-				      
+
+
 
 (defun feedback-planner-init (operator facts options)
   (let* ((operator (load-operators operator))
@@ -165,7 +165,7 @@
        using (hash-value val)
        do (if (and (eq val 'false) (null (gethash (cons 0 key) value-hash)))
 	      (setf (gethash (cons 0 key) value-hash) 0)))
-    
+
     (z3::choose-solver (solver t :trace trace)
       (let ((planner (cpd-plan-init cpd solver options)))
 	(make-feedback-planner :planner planner
@@ -181,7 +181,7 @@
 									:feedback-func)
 			       :true-thresh threshold
 			       :false-thresh threshold)))))
-      
+
 
 
 (defun calculate-plan-probability (feedback-planner plan)
@@ -232,7 +232,7 @@
 	     (remhash start-key start-map))
 	    ((and (eq start-val 'false) (<= false-thresh prob-val))
 	     (remhash start-key start-map))))))
-	  
+
 
 (defun feedback-planner-loosen-threshold (feedback-planner)
   (let ((new-false (- (feedback-planner-false-thresh feedback-planner) .1))
@@ -247,13 +247,14 @@
 	       (checked-plans (feedback-planner-previous-plans feedback-planner)))
 
 	  (format t "~%loosening threshold ~%")
-	  (loosen-start-state start-map value-hash new-false new-true)
+	  (loosen-start-state start-map value-hash new-true new-false)
+	  (setf (constrained-domain-start-map domain) start-map)
 
 	  (setf (feedback-planner-true-thresh feedback-planner) new-true)
 	  (setf (feedback-planner-false-thresh feedback-planner) new-false)
-	  
+
 	  (setf (cpd-planner-k planner) 0) ;;reset k to 0
-	  
+
 	  (funcall add '(pop 1))
 	  (funcall add '(pop 1))
 	  (cpd-smt-encode-start add domain)
@@ -267,7 +268,7 @@
 	  (setf (cpd-planner-backtracking planner) t)
 
 	  (feedback-planner-step feedback-planner)))))
-    
+
 
 (defun feedback-planner-next (feedback-planner new-plan)
   (let ((current-prob (feedback-planner-success-probability feedback-planner)))
@@ -276,7 +277,7 @@
       (cond
 	((= new-prob 1) ;;return current plan if it is certain
 	 (feedback-planner-plan feedback-planner))
-	
+
 	(t ;;iterate
 	 (let* ((planner (feedback-planner-planner feedback-planner))
 		(add (cpd-planner-eval-function planner))
@@ -288,21 +289,21 @@
 		(mangle-plan (cons 'and (cons (cpd-mangle-exp domain goal k)
 					      limiting-actions))))
 
-	   
+
 	   ;;prefer plans that are less steps
 	   (if (> new-prob current-prob)
 	       (progn
 		 (format t "~%Success probability: ~D ~%" new-prob)
 		 (setf (feedback-planner-success-probability feedback-planner) new-prob)
 		 (setf (feedback-planner-plan feedback-planner) new-plan)))
-	   
+
 	   (funcall add '(pop 1))
 	   (funcall add '(pop 1))
 
 	   (funcall add `(assert (not ,mangle-plan)))
-	   
+
 	   (funcall add '(push 1))
-	      
+
 	   (cpd-smt-encode-goal add domain goal k)
 	   (setf (cpd-planner-added-goals planner) (cdr (cpd-planner-added-goals planner)))
 	   (setf (cpd-planner-remaining-goals planner)
@@ -311,7 +312,7 @@
 	   (setf (feedback-planner-previous-plans feedback-planner)
 		 (cons mangle-plan
 		       (feedback-planner-previous-plans feedback-planner)))
-	   
+
 	   (feedback-planner-step feedback-planner)))))))
 
 (defun feedback-planner-step (feedback-planner)
