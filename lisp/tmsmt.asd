@@ -28,7 +28,8 @@
                (:file "task/cpdl" :depends-on ("util" "expression"))
                (:file "task/cpdl-plan" :depends-on ("task/cpdl"))
                (:file "task/pddl-sat" :depends-on ("task/cpdl-plan"))
-	       (:file "task/feedback-search" :depends-on ("task/pddl-sat"))
+	       (:file "task/feedback-functions" :depends-on ("task/pddl-sat"))
+	       (:file "task/feedback-search" :depends-on ("task/feedback-functions"))
 	       (:file "task/cpdl-path-checker" :depends-on ("task/pddl-sat"))
 	       (:file "task/pddl-path-checker" :depends-on ("task/cpdl-path-checker"))
 
