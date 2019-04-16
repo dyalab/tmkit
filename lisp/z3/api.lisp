@@ -95,7 +95,6 @@
 		    (eq (car thing) '|declare-const|)
 		    (eq (car thing) :declare-const))
 	   (format t "~&~A" thing))
-	  
 	  ((eq (car thing) '|define-fun|)
 	   (format t "~&~A" (pretty-print-transition thing)))
 	  ((eq (car thing) 'get-value)
@@ -107,9 +106,9 @@
 
 (defun pretty-print-transition (exp)
   (labels ((print-now (exp)
-	     (format nil "now_~{~A~^_~}" exp))
+	     (format nil "now_~{~A~^_~}" (ensure-list exp)))
 	   (print-next (exp)
-	     (format nil "next_~{~A~^_~}" exp))
+	     (format nil "next_~{~A~^_~}" (ensure-list exp)))
 	   (recurse (exp)
 	     (loop for e in exp
 		collect (cond
@@ -335,7 +334,7 @@
            (type function function)
            (type list args))
   (unless (and args
-               (null (cdr args)))	
+               (null (cdr args)))
     (error "Wanted one argument: ~A" args) )
   (funcall function context (smt->ast context (car args))))
 
