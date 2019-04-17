@@ -505,6 +505,12 @@
   (let ((context (or context (z3-optimize-context solver))))
     (z3-optimize-maximize context solver (smt->ast context exp))))
 
+(defun smt-assert-soft (solver exp weight &optional context)
+  (declare (type z3-optimize solver))
+  (let ((context (or context (z3-optimize-context solver))))
+    (z3-optimize-assert-soft context solver (smt->ast context exp)
+			     (z3-get-numeral-string context (smt->ast context weight)))))
+
 (defun smt-eval (solver stmt)
   ;;(declare (type z3-solver solver))
   (smt-trace solver stmt)
@@ -540,7 +546,10 @@
       (((minimize |minimize| :minimize) exp)
        (smt-minimize solver exp (context)))
       (((maximize |maximize| :maximize) exp)
-       (smt-maximize solver exp (context))))))
+       (smt-maximize solver exp (context)))
+      ;;soft assertion
+      (((soft-assert |soft-assert| :soft-assert) exp weight)
+       (smt-assert-soft solver exp weight (context))))))
 
 (defun smt-value-int (context ast)
   (with-foreign-object (i :int)

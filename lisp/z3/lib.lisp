@@ -33,6 +33,12 @@
   (optimize z3-optimize-type)
   (ast z3-ast-type))
 
+(defcfun "Z3_optimize_assert_soft" :unsigned-int
+  (context z3-context-type)
+  (optimize z3-optimize-type)
+  (ast z3-ast-type)
+  (weight :string))
+
 (defcfun ("Z3_optimize_inc_ref" %z3-optimize-inc-ref) :void
   (context z3-context-type)
   (optimize z3-optimize-type))
@@ -347,6 +353,10 @@
   (context z3-context-type)
   (a z3-ast-type)
   (i :pointer))
+
+(defcfun "Z3_get_numeral_string" z3-string
+  (context z3-context-type)
+  (a z3-ast-type))
 
 (defcfun "Z3_get_numeral_rational_int64" z3-lbool
   (context z3-context-type)

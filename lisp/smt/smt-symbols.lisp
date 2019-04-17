@@ -63,7 +63,7 @@
 
    :=>
    :<=>
-   
+
    :^
 
    :minimize
@@ -71,6 +71,9 @@
 
    :maximize
    :|maximize|
+
+   :soft-assert
+   :|soft-assert|
 
    :now
    :|now|

@@ -137,7 +137,7 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
 	 (equal (gethash name2 start-hash) name1)
 	 (in-start (gethash name1 start-hash) name2 start-hash)))))
 
-				      
+
 (defun cpd-smt-encode-goal (function domain goal step)
   (funcall function `(assert ,(cpd-mangle-exp domain goal step))))
 
@@ -216,7 +216,7 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
     (loop for (exp val) in goal-values
      do (nsubst val exp goal-exp :test 'equal))
     (eval goal-exp)))
-  
+
 
 
 
@@ -282,8 +282,8 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
       (setf (cpd-planner-backtracking planner) t)
       (if (and (cpd-planner-added-goals planner)
 	       (>= step (cpd-planner-max-steps planner)))
-	  (cpd-planner-decrement-goal planner)))))    
-  
+	  (cpd-planner-decrement-goal planner)))))
+
 
 (defun cpd-plan-init (domain solver &optional options)
   "Initialize the planner."
@@ -301,6 +301,10 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
         (cpd-define-transition domain)
       (add fun)
 
+      ;;soft assertions
+      (loop for (weight . clause) in (constrained-domain-soft-asserts domain)
+	   do (funcall #'add `(soft-assert ,(cpd-mangle-exp domain clause 0) ,weight)))
+
       ;; Push and Assert Goal
       (funcall #'add '(push 1))
 
@@ -309,8 +313,10 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
       ;;add Optimization if defined
       (if (constrained-domain-metric domain)
 	  (cpd-smt-encode-metric #'add domain 0))
-	  
-      
+
+
+
+
 
       ;; Result
       (make-cpd-planner :domain domain
@@ -358,7 +364,7 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
          ;; UNSAT: Step
          (incf (cpd-planner-k planner))
          (cpd-plan-step planner))
-        
+
         (t
 	 ;; Over max steps
 	 (cond
@@ -370,7 +376,7 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
 	    (cpd-planner-decrement-goal planner)
 	    (if (and (null (cpd-planner-added-goals planner))
 		     (>= (cpd-planner-k planner) max-steps))
-		(values nil nil planner)		     
+		(values nil nil planner)
 		(cpd-plan-step planner)))))))))
 
 
@@ -388,16 +394,21 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
     (if (not backtracking) (cpd-smt-encode-fluents add domain k))
 
     (cpd-smt-encode-transition add domain args (1- k))
-	
+
+    ;;soft assertions
+    (loop for (weight . clause) in (constrained-domain-soft-asserts domain)
+       do (funcall add `(soft-assert ,(cpd-mangle-exp domain clause k) ,weight)))
 
     ;; Push and assert goal
     (funcall add '(push 1))
 
     (cpd-smt-encode-goal add domain goal k)
-    
+
     ;;add Optimization if defined
     (if (cpd-planner-optimize planner)
 	(cpd-smt-encode-metric add domain k))
+
+
 
     ;; Recurse
     (cpd-plan-next planner)))
@@ -406,7 +417,8 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
 (defun cpd-plan (domain &optional options)
   (let* ((options (or options (cpd-plan-options)))
          (trace (cpd-plan-option options :trace))
-	 (use-solver (null (constrained-domain-metric domain))))
+	 (use-solver (not (or (constrained-domain-metric domain)
+			      (constrained-domain-soft-asserts domain)))))
     (z3::choose-solver (solver use-solver :trace trace)
       (let ((planner (cpd-plan-init domain solver options)))
 	(cpd-plan-next planner)))))

@@ -80,6 +80,9 @@
   ;;If populated, builds a probability function for the transition and goal clauses.
   probability-threshold
 
+  ;;list of soft assertions and their weights
+  soft-asserts
+
   ;; Caches
 
   ;; sexp -> mangled
@@ -196,7 +199,7 @@
 		     (setf (gethash fluent hash) 1))
 		    ((and (constrained-domain-probability-threshold cpd) (eq 'false value))
 		     (setf (gethash fluent hash) 0))
-		    (t	      
+		    (t
 		     (setf (gethash fluent hash) value)))))))
        (if (consp thing)
            (destructuring-case thing
@@ -233,7 +236,9 @@
      (assert (null (constrained-domain-metric cpd)))
      (setf (constrained-domain-metric cpd) clause))
     ((probability-threshold clause)
-     (setf (constrained-domain-probability-threshold cpd) clause)))
+     (setf (constrained-domain-probability-threshold cpd) clause))
+    ((assert-soft clause weight)
+     (push (cons weight (ensure-list clause)) (constrained-domain-soft-asserts cpd))))
   ;; Result
   cpd)
 
