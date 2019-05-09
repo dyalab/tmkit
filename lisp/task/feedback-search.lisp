@@ -22,8 +22,20 @@
   ;;functions determining the value of a fluent at the next timestep given the current timestep
   fluent-propagation-list
 
-  ;;previous plans so searching isn't repeated
-  (previous-plans nil)
+  ;;new bounds that limit the search space perminately
+  (new-bounds nil)
+
+  ;;previous plans that have a low probability of success. Forgotten when we increase the step
+  (low-plans nil)
+
+  ;; A tree set containing plans sorted by the probability that the
+  ;; transitions hold for each step. Elements are stored in the form (probability . plan)
+  bound-set
+
+  ;; A tree set containing plans sorted by the probability that the
+  ;; plan results in the state being the goal state. Elements are
+  ;; stored in the form (probability . plan)
+  ;;plan-set
 
   ;;function to determine what set of actions to assert as not true in order to generate a new plan
   feedback-function
@@ -45,15 +57,24 @@
 
 (defun feedback-plan-options (&key (max-steps 10)
 				(trace nil)
-				(threshold .5)
-				(feedback-func 'make-assert-not-weakest-step))
+				(feedback-func 'make-assert-not-up-to-weakest-step))
   `((:max-steps . ,max-steps)
     (:trace . ,trace)
-    (:threshold . ,threshold)
     (:feedback-func . ,feedback-func)))
 
 (defun feedback-plan-option (options thing)
   (cdr (assoc thing options)))
+
+(defun compare-first-element (l1 l2)
+  (cond
+    ((= (car l1) (car l2))
+     (if (equal (cdr l1) (cdr l2))
+	 0
+	 1))
+    ((> (car l1) (car l2))
+     1)
+    (t
+     -1)))
 
 (defun collect-bool-function-names (op)
   (loop for x in (append (pddl-operators-functions op)
@@ -161,7 +182,11 @@
 
     ;;intialize cpd and feedback planners
     (z3::choose-solver (solver t :trace trace)
-      (let ((planner (cpd-plan-init cpd solver cpd-opts)))
+      (let ((planner (cpd-plan-init cpd solver cpd-opts))
+	    (succ-prob (eval (cons '*
+				   (loop for goal-func in goal-funcs
+				      collect (funcall
+					       goal-func value-hash 0))))))
 	(incf (cpd-planner-k planner))
 	(make-feedback-planner :planner planner
 			       :probability-transition-function (compile-propagation-function
@@ -173,10 +198,9 @@
 							(ground-domain-operators ground))
 			       :fluent-propagation-list variable-prop
 			       :plan nil
-			       :success-probability (eval (cons '*
-								(loop for goal-func in goal-funcs
-								   collect (funcall
-									    goal-func value-hash 0))))
+			       :success-probability succ-prob
+			       :bound-set (make-tree-set #'compare-first-element)
+			       ;;:plan-set (make-tree-set #'compare-first-element)
 			       :feedback-function (feedback-plan-option options
 									:feedback-func)
 			       :true-thresh threshold
@@ -207,6 +231,7 @@
 				 for goal-func in goal-funcs
 				 collect (funcall goal-func values timestep))))
 	(values (eval (cons '* (cons transition-probability goal-probability)))
+		transition-probability
 		limiting-step)))))
 
 (defun propagate-transition-probabilities (values trans-func fluent-propagation max-steps succ-prob)
@@ -242,15 +267,25 @@
 
 
 (defun feedback-planner-modify-threshold (feedback-planner)
-  (let* ((new-false (- (feedback-planner-false-thresh feedback-planner) .1))
-	 (new-true (+ (feedback-planner-true-thresh feedback-planner) .1))
-	 (planner (feedback-planner-planner feedback-planner))
-	 (domain (cpd-planner-domain planner))
-	 (max-steps (feedback-planner-max-steps feedback-planner))
-	 (add (cpd-planner-eval-function planner))
-	 (k (cpd-planner-k planner))
-	 (checked-plans (feedback-planner-previous-plans feedback-planner)))
+  (let* ((new-false  (- (feedback-planner-false-thresh feedback-planner) .1))
+	 (new-true   (+ (feedback-planner-true-thresh feedback-planner) .1))
+	 (planner    (feedback-planner-planner feedback-planner))
+	 (domain     (cpd-planner-domain planner))
+	 (max-steps  (feedback-planner-max-steps feedback-planner))
+	 (add        (cpd-planner-eval-function planner))
+	 (k          (cpd-planner-k planner))
+	 (new-bounds (feedback-planner-new-bounds feedback-planner))
+	 (low-plans  (feedback-planner-low-plans feedback-planner)))
 
+    ;; Add in new bounds if they exist
+    (funcall add '(pop 1))
+    (funcall add '(pop 1))
+
+    (if new-bounds
+	(funcall add `(assert ,(cons 'and new-bounds))))
+    (setf (feedback-planner-new-bounds feedback-planner) nil)
+
+    ;; Figure out what to do next
     (cond
       ((and (or (<= new-false 0) (>= new-true 1))
 	    (= (cpd-planner-k planner) max-steps))
@@ -262,6 +297,13 @@
        (format t "~%re-tightening threshold~%")
        (setf (feedback-planner-true-thresh feedback-planner) 0.5)
        (setf (feedback-planner-false-thresh feedback-planner) 0.5)
+       (setf (feedback-planner-low-plans feedback-planner)
+	     (loop for i from 0 to k
+		collect `(not ,(cpd-mangle-exp domain
+					       (car (last (constrained-domain-goal-clauses domain)))
+					       i))))
+
+
 
        (setf (cpd-planner-options planner)
 	     `((:max-steps . ,(+ 1 k))
@@ -272,16 +314,10 @@
        (setf (constrained-domain-start-map domain)
 	     (feedback-planner-intial-start feedback-planner))
 
-       (funcall add '(pop 1))
-       (funcall add '(pop 1))
-
-       (if checked-plans
-	   (funcall add `(assert (not ,(cons 'or checked-plans)))))
-       (setf (feedback-planner-previous-plans feedback-planner) nil)
-
        (cpd-smt-encode-transition add domain (cpd-planner-transition-args planner) (1- k))
 
        (cpd-smt-encode-start add domain)
+       (funcall add `(assert ,(cons 'and low-plans)))
        (funcall add '(push 1))
 
        (incf (cpd-planner-k planner))
@@ -289,8 +325,8 @@
 
        (feedback-planner-step feedback-planner))
 
-      ;;otherwise loosen the bounds
       (t
+       ;;otherwise loosen the bounds
        (let* ((start-map (constrained-domain-start-map domain))
 	      (value-hash (feedback-planner-value-hash feedback-planner)))
 
@@ -301,24 +337,44 @@
 	 (setf (feedback-planner-true-thresh feedback-planner) new-true)
 	 (setf (feedback-planner-false-thresh feedback-planner) new-false)
 
-	 (funcall add '(pop 1))
-	 (funcall add '(pop 1))
-
-	 (if checked-plans
-	     (funcall add `(assert (not ,(cons 'or checked-plans)))))
-	 (setf (feedback-planner-previous-plans feedback-planner) nil)
 
 	 (cpd-smt-encode-start add domain)
+	 ;; Don't recheck things that we've already tried
+	 (if low-plans
+	     (funcall add `(assert ,(cons 'and low-plans))))
 	 (funcall add '(push 1))
 
 	 (setf (cpd-planner-backtracking planner) t)
 
 	 (feedback-planner-step feedback-planner))))))
 
+(defun check-and-add-bounds (feedback-planner new-prob)
+  (let* ((add (cpd-planner-eval-function (feedback-planner-planner feedback-planner)))
+	 (bound-tree (feedback-planner-bound-set feedback-planner))
+	 (new-bounds ()))
+    (labels ((rec (tree)
+	       (if (not (= (tree-set-count tree) 0))
+		   (progn
+		     (let* ((min-el (tree-set-min tree))
+			    (min    (car min-el))
+			    (bound  (cdr min-el)))
+		       (if (< min new-prob)
+			   (progn
+			     (push bound new-bounds)
+			     (rec (tree-set-remove-min tree)))
+			   tree)))
+		   tree)))
+      (setf (feedback-planner-bound-set feedback-planner) (rec bound-tree))
+      (if new-bounds
+	  (progn
+	    (setf (feedback-planner-new-bounds feedback-planner)
+		  (append new-bounds (feedback-planner-new-bounds feedback-planner)))
+	    (funcall add `(assert ,(cons 'and new-bounds))))))))
+
 
 (defun feedback-planner-next (feedback-planner new-plan)
   (let ((current-prob (feedback-planner-success-probability feedback-planner)))
-    (multiple-value-bind (new-prob limiting-step)
+    (multiple-value-bind (new-prob trans-prob limiting-step)
 	(calculate-plan-probability feedback-planner new-plan)
       (cond
 	((= new-prob 1) ;;return current plan if it is certain
@@ -332,35 +388,49 @@
 		(k (cpd-planner-k planner))
 		(feedback-func (feedback-planner-feedback-function feedback-planner))
 		(limiting-actions (funcall feedback-func new-plan limiting-step domain))
-		(mangle-plan (if (> limiting-step k)
-				 (cons 'and (cons (cpd-mangle-exp domain goal k)
-						  limiting-actions))
-				 (cons 'and limiting-actions))))
+		(bound-assert `(not ,(cons 'and limiting-actions))))
 
+	   ;; Add the new plan to the tree set
+	   ;; (setf (feedback-planner-plan-set feedback-planner)
+	   ;; 	 (tree-set-insert (feedback-planner-plan-set feedback-planner)
+	   ;; 			  (cons new-prob new-plan)))
+
+	   (funcall add '(pop 1))
+	   (funcall add '(pop 1))
 
 	   ;;prefer plans that are less steps
 	   (if (> new-prob current-prob)
 	       (progn
 		 (format t "~%Success probability: ~D ~%" new-prob)
 		 (setf (feedback-planner-success-probability feedback-planner) new-prob)
-		 (setf (feedback-planner-plan feedback-planner) new-plan)))
+		 (setf (feedback-planner-plan feedback-planner) new-plan)
+		 (check-and-add-bounds feedback-planner new-prob)))
 
-	   (funcall add '(pop 1))
-	   (funcall add '(pop 1))
-
-	   (if (not (equal mangle-plan '(and)))
-	       (funcall add `(assert (not ,mangle-plan))))
+	   ;; Bound the search tree
+	   (funcall add `(assert ,bound-assert))
 
 	   (funcall add '(push 1))
 
+	   ;; Re-add last goal
 	   (cpd-smt-encode-goal add domain goal k)
 	   (setf (cpd-planner-added-goals planner) (cdr (cpd-planner-added-goals planner)))
 	   (setf (cpd-planner-remaining-goals planner)
 		 (cons goal (cpd-planner-remaining-goals planner)))
 
-	   (setf (feedback-planner-previous-plans feedback-planner)
-		 (cons mangle-plan
-		       (feedback-planner-previous-plans feedback-planner)))
+	   ;; Add the new info to new bounds to eventually be
+	   ;; asserted as not true before the start only if we got to a
+	   ;; lower probability before the final step
+	   (if ( < trans-prob current-prob)
+		 (setf (feedback-planner-new-bounds feedback-planner)
+		       (cons bound-assert
+			     (feedback-planner-new-bounds feedback-planner)))
+		 (progn
+		   (setf (feedback-planner-low-plans feedback-planner)
+			 (cons bound-assert
+			       (feedback-planner-low-plans feedback-planner)))
+		   (setf (feedback-planner-bound-set feedback-planner)
+		       (tree-set-insert (feedback-planner-bound-set feedback-planner)
+					(cons trans-prob bound-assert)))))
 
 	   (multiple-value-bind (plan sat planner)
 	       (cpd-plan-next planner)
@@ -381,4 +451,5 @@
 (defun feedback-search (operators facts &optional options)
   (let ((feedback-planner (feedback-planner-init operators facts
 						 (or options (feedback-plan-options)))))
+    (format t "~%Initial success chance ~D~%" (feedback-planner-success-probability feedback-planner))
     (values feedback-planner (cpd-actions (feedback-planner-step feedback-planner)))))
