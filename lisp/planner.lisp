@@ -38,7 +38,7 @@
 (defun format-state-variable (predicate step)
   (if (consp predicate)
       (smt-mangle-list `(,@predicate ,step))
-      predicate))
+      (format-state-variable (ensure-list predicate) step)))
 
 (defun mangle-var (thing &key args step)
   (let ((base (append (ensure-list thing)
@@ -81,7 +81,7 @@
 	     if (not (or (eq 'bool type) (eq t type)))
 	     append (loop for obj in (tree-set-list (tree-map-find type-objects type))
 		       collect (list obj type)))))
-				 
+
 
 
 ;; (let ((variable-type (make-hash-table :test #'equal)))
@@ -276,7 +276,7 @@
        (otherwise
 	(loop for args in exp
 	   append (collect-variables args variables)))))))
-  
+
 ;; TODO: ground derived types
 ;;       - add to variables (separate slot for derived variables)
 ;;       - add axioms indicating state
@@ -307,7 +307,7 @@
                                        :effect '(and))
                    ground-operators)))
 
-    
+
     (multiple-value-bind (derived-type derived-axioms)
         (ground-derived type-objects (pddl-operators-derived operators))
       (let* ((initial-true (replace-axiom (pddl-facts-init facts) derived-axioms))
@@ -419,14 +419,14 @@
                                         (ground-domain-variable-type domain)))
            (type-objects (ground-domain-type-objects domain)))
       (fold-tree-set (lambda (list type)
-                       (case type
-                         ((bool object t) list)
-                         (otherwise
-                          (cons (smt-declare-enum type
-                                                  (map-tree-set 'list (lambda (name)
-                                                                        (plan-enum-symbol type name))
-                                                                (tree-map-find type-objects type)))
-                                 list))))
+		       (case type
+			 ((|Bool| object t) list)
+			 (otherwise
+			  (cons (smt-declare-enum type
+						  (map-tree-set 'list (lambda (name)
+									(plan-enum-symbol type name))
+								(tree-map-find type-objects type)))
+				list))))
                      nil
                      object-types))))
 
@@ -495,7 +495,7 @@
                        (ecase action-encoding
                          (:boolean (smt-ite
                                     ;; if goal
-                                    (rewrite-exp (ground-domain-goal domain) 'i)
+                                    (rewrite-exp (car (ground-domain-goal domain)) 'i)
                                     ;; then no op
                                     (smt-not (apply #'smt-or op-i))
                                     ;; else op
@@ -618,7 +618,7 @@
 (defun smt-plan-context-ground-actions (instance)
   (ground-domain-operators (smt-plan-context-domain instance)))
 (defun smt-plan-context-goal (instance)
-  (ground-domain-goal (smt-plan-context-domain instance)))
+  (car (ground-domain-goal (smt-plan-context-domain instance))))
 (defun smt-plan-context-action-encoding (instance)
   (ground-domain-action-encoding (smt-plan-context-domain instance)))
 

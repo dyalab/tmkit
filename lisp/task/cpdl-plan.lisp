@@ -97,9 +97,9 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
                                                    ,type)))
                         domain))
 
-(defun cpd-smt-encode-start (function domain)
+(defun cpd-smt-encode-start (function domain &optional (push-num 1))
   "Encode the start state"
-  (funcall function '(push 1))
+  (funcall function `(push ,push-num))
   (map-cpd-start nil
                  (lambda (name value)
                    (let ((name (cpd-mangle-fluent domain name 0)))
@@ -285,7 +285,7 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
 	  (cpd-planner-decrement-goal planner)))))
 
 
-(defun cpd-plan-init (domain solver &optional options)
+(defun cpd-plan-init (domain solver &optional options (push-num 1))
   "Initialize the planner."
   (flet ((add (stmt)
            (z3::smt-eval solver stmt)))
@@ -294,7 +294,7 @@ TRACE: Output stream to write generate SMTLib statements (for debugging)."
     (cpd-smt-encode-fluents #'add domain 0)
 
     ;; Start
-    (cpd-smt-encode-start #'add domain)
+    (cpd-smt-encode-start #'add domain push-num)
 
     ;; Transition Function
     (multiple-value-bind (fun args)
