@@ -281,6 +281,32 @@ RETURNS: (VALUES pddl-sexp (or :domain :problem))"
                    (setf (gethash supertype hash) t))))))))
       ops)))
 
+(defun collapse-object-list (obj-list new-objs)
+  (labels ((collect-names (type-list)
+             (cond
+               ((null type-list)
+                (values nil nil))
+               ((eq (car type-list) '-)
+                (destructuring-bind (dash type &rest rest) type-list
+                  (assert (eq '- dash))
+                  (values `(- ,type) rest)))
+               (t
+                (multiple-value-bind (to-add rest-of-list)
+                    (collect-names (cdr type-list))
+		  (if (not (find (car type-list) obj-list))
+		      (values (cons (car type-list) to-add)
+			      rest-of-list)
+		      (values to-add rest-of-list))))))
+           (rec (type-list)
+             (when type-list
+               (multiple-value-bind (to-add type-list)
+                   (collect-names type-list)
+		 (if (not (eq (car to-add) '-))
+		     ;; If the first element is a dash then we added a type with no objects
+		     (append to-add (rec type-list))
+		     (rec type-list))))))
+    (append obj-list (rec new-objs))))
+
 (defun merge-facts (exp1 exp2
                     &key
                       name)
@@ -304,9 +330,12 @@ RETURNS: (VALUES pddl-sexp (or :domain :problem))"
                           (check-symbol domain merged-domain)
                           (setq merged-domain domain)))
                      ((:objects &rest objs)
-                      (setq merged-objects (append merged-objects objs)))
+                      (setq merged-objects (collapse-object-list merged-objects objs)))
                      ((:init &rest things)
-                      (setq merged-init (append merged-init things)))
+                      (setq merged-init (append merged-init (loop for x in things
+							       if (not
+								   (find x merged-init :test 'equal))
+								 collect x))))
                      ((:goal goal)
                       (setq merged-goal
                             (if merged-goal
