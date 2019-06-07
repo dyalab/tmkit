@@ -27,7 +27,12 @@
                       (state-function *scene-state-function*)
                       (goal-function *goal-state-function*)
                       (objects-function *scene-objects-function*))
-  (let ((start-state (scene-state state-function init-scene configuration operators))
+  (let ((start-state (map 'list (lambda (x)
+				  (loop for var in x
+				     collect (if (stringp var)
+						 (intern (string-upcase var) 'TMSMT/PDDL)
+						 var)))
+			  (scene-state state-function init-scene configuration operators)))
         (goal-state (scene-state goal-function goal-scene configuration operators))
         (objects (canonize-exp (funcall objects-function init-scene)
                                (when operators (pddl-operators-canon operators))))
@@ -37,7 +42,9 @@
     `(define (problem ,problem)
          (:domain ,domain)
        (:objects ,@(loop for o in objects
-                      nconc (append (cdr o)
+                      nconc (append (map 'list (lambda (x)
+					   (intern (string-upcase x) 'TMSMT/PDDL))
+					 (cdr o))
                                     (list '- (car o)))))
        ,(cons :init start-state)
        (:goal ,(cons 'and goal-state)))))
@@ -45,7 +52,13 @@
 (defun itmp-action (scene-graph sexp
                              &key
                                start)
-  (let (planner error)
+  (let (planner
+	error
+	(sexp (loop for x in sexp
+		 collect (if (symbolp x)
+			     (symbol-name x)
+			     x))))
+
     (labels ((helper ()
                (handler-case
                    (let ((action-op (tm-op-action sexp scene-graph start)))
@@ -153,6 +166,7 @@ PREFIX-CACHE: Cache of plan prefixes
                       (let ((tm-plan (tm-plan tm-plan new-tm-plan)))
                         (setf (gethash trail *itmp-cache*) tm-plan)
                         (rec task-plan tm-plan trail))))))))
+      (format t "ITMP-REC~%")
       (if prefix-cache
           (cache task-plan)
           (rec-start task-plan)))))

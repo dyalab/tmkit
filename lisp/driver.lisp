@@ -175,6 +175,81 @@ CONSTRAINTS: What type of incremental constraints to use to generate alternate p
                    (quit-system 1)))))))
 
 
+
+(defun cpdl-tmp-driver (&key
+			  start-scene
+			  goal-scene
+			  start-plan
+			  scripts
+			  gui
+			  pddl
+			  options
+			  planner-func
+			  communication-func
+			  motion-plan-func
+			  motion-timeout)
+
+
+  (setq *itmp-motion-time* 0d0
+        *itmp-task-time* 0d0
+        *itmp-total-time* 0d0
+        *itmp-int-time* 0d0)
+  (setq *itmp-cache* (make-hash-table :test #'equal))
+
+  ;; Load script functions into appropriate globals
+  (map nil #'tmp-script (ensure-list scripts))
+
+  ;; Load scenes and parse options
+  (let* ((*motion-timeout* (or motion-timeout *motion-timeout*))
+         domain-exp
+         facts-exp
+         (start-scene (ensure-list start-scene))
+         (goal-scene (ensure-list goal-scene))
+         (pddl (ensure-list pddl))
+         (start-scene-graph (scene-graph start-scene))
+         (start (or (when start-plan
+                      (parse-tmplan start-scene-graph start-plan))
+                    (robray::make-configuration-map)))
+         (goal-scene-graph (scene-graph goal-scene))
+	 (communication-func (or communication-func
+				 'default-communication))
+	 (motion-plan-func (or motion-plan-func
+			       'default-motion-plan))
+	 (options '((:max-steps . 10)(:trace . nil)))) ; TODO: actually parse given options
+
+    ;; Load PDDL
+    (dolist (x (ensure-list pddl))
+      (multiple-value-bind (sexp type) (load-pddl-sexp x)
+	(ecase type
+	  (:domain
+	   (unless (null domain-exp)
+	     (error "Multiple PDDL domains."))
+	   (setq domain-exp sexp))
+	  (:problem
+	   (setq facts-exp (merge-facts facts-exp sexp))))))
+
+     ;; Maybe display scene
+      (when gui
+        (robray::win-set-scene-graph start-scene-graph :configuration-map start))
+
+    (let ((plan (cpdl-tmp :start-graph start-scene-graph
+			  :start-q start
+			  :domain domain-exp
+			  :facts (merge-facts facts-exp (scene-facts start-scene-graph
+								     goal-scene-graph
+								     :operators
+								     (load-operators domain-exp)))
+			  :options options
+			  :planner-func planner-func
+			  :communication-func communication-func
+			  :motion-plan-func motion-plan-func)))
+
+      ;; Maybe display plan
+      (when (and gui plan)
+	(robray::win-display-motion-plan-sequence plan)))))
+
+
+
 (defparameter +copying+
   (read-file-into-string (merge-pathnames "COPYING"
                                           *abs-srcdir*)))
@@ -208,6 +283,14 @@ Written by Neil T. Dantam
     (if (zerop (length result))
         nil
         result)))
+
+(defun env-symb (varname)
+  (let*	((var (string-upcase (uiop/os:getenvp varname)))
+	 (split-pos (search ":" var)))
+    (if split-pos
+	(intern (subseq var (+ 2 split-pos)) (intern (subseq var 0 split-pos)))
+	(if var
+	    (intern var 'tmsmt)))))
 
 (defun env-bool (varname)
   (let ((result (uiop/os:getenv varname)))
@@ -246,44 +329,61 @@ Written by Neil T. Dantam
                                    (render-options-4k))
                                  (render-options (env-list "TMSMT_RENDER_OPTIONS"))
                                  (render-options-default)))
-         (gui (env-bool  "TMSMT_GUI")))
+         (gui (env-bool  "TMSMT_GUI"))
+	 (planner-func (env-symb "TMSMT_PLANNER")))
     (flet ((helper ()
-             (cond
-               ((uiop/os:getenv "TMSMT_VERSION")
-                (tmp-version))
-               ((uiop/os:getenv "TMSMT_VERSION_MAN")
-                (tmp-version-man))
-               ((uiop/os:getenv "TMSMT_PYTHON_SHELL")
-                (clpython:repl))
-               ((and plan-file gui)
-                (display-tm-plan-file scene-files plan-file))
-               ((and plan-file render)
-                (render-tm-plan-file scene-files plan-file
-                                     :options render-options
-                                     :time-scale (env-double "TMSMT_RENDER_TIME_SCALE" 1d0)
-                                     :include (env-string "TMSMT_RENDER_INCLUDE")
-                                     :encode-video (env-bool  "TMSMT_ENCODE_VIDEO")
-                                     :camera-tf camera-tf))
-               (t
-                ;; Find the plan
-                (tmp-driver :start-scene scene-files
-                            :times-file (env-string "TMSMT_TIMES_FILE")
-                            :goal-scene goal-files
-                            :start-plan (uiop/os:getenv "TMSMT_INITIAL_PLAN")
-                            :scripts script-files
-                            :pddl pddl-files
-                            :max-steps max-steps
-                            :gui gui
-                            :motion-timeout (if-let ((x (uiop/os:getenv "TMSMT_MOTION_TIMEOUT")))
-                                              (max (amino::parse-float x)
-                                                   0.1))
-                            :write-facts (uiop/os:getenv "TMSMT_WRITE_FACTS")
-                            :output (uiop/os:getenv "TMSMT_OUTPUT")
-                            :verbose (uiop/os:getenv "TMSMT_VERBOSE"))))))
+	     (cond
+	       ((uiop/os:getenv "TMSMT_VERSION")
+		(tmp-version))
+	       ((uiop/os:getenv "TMSMT_VERSION_MAN")
+		(tmp-version-man))
+	       ((uiop/os:getenv "TMSMT_PYTHON_SHELL")
+		(clpython:repl))
+	       ((and plan-file gui)
+		(display-tm-plan-file scene-files plan-file))
+	       ((and plan-file render)
+		(render-tm-plan-file scene-files plan-file
+				     :options render-options
+				     :time-scale (env-double "TMSMT_RENDER_TIME_SCALE" 1d0)
+				     :include (env-string "TMSMT_RENDER_INCLUDE")
+				     :encode-video (env-bool  "TMSMT_ENCODE_VIDEO")
+				     :camera-tf camera-tf))
+	       (planner-func
+		;; If there is a CPDL planning function given, plan using that
+		(cpdl-tmp-driver :start-scene scene-files
+				 :goal-scene goal-files
+				 :start-plan (uiop/os:getenv "TMSMT_INITIAL_PLAN")
+				 :scripts script-files
+				 :gui gui
+				 :pddl pddl-files
+				 :options (env-list "TMSMT_OPTIONS")
+				 :planner-func planner-func
+				 :communication-func (env-symb "TMSMT_COMMUNICATION")
+				 :motion-plan-func (env-symb "TMSMT_MOTION_PLANNER")
+				 :motion-timeout (if-let ((x (uiop/os:getenv "TMSMT_MOTION_TIMEOUT")))
+						   (max (amino::parse-float x)
+							0.1))))
+
+	       (t
+		;; Find the plan
+		(tmp-driver :start-scene scene-files
+			    :times-file (env-string "TMSMT_TIMES_FILE")
+			    :goal-scene goal-files
+			    :start-plan (uiop/os:getenv "TMSMT_INITIAL_PLAN")
+			    :scripts script-files
+			    :pddl pddl-files
+			    :max-steps max-steps
+			    :gui gui
+			    :motion-timeout (if-let ((x (uiop/os:getenv "TMSMT_MOTION_TIMEOUT")))
+					      (max (amino::parse-float x)
+						   0.1))
+			    :write-facts (uiop/os:getenv "TMSMT_WRITE_FACTS")
+			    :output (uiop/os:getenv "TMSMT_OUTPUT")
+			    :verbose (uiop/os:getenv "TMSMT_VERBOSE"))))))
       (if gui
-          (progn
-            (robray::win-create :title "TMSMT"
-                                :stop-on-quit t)
-            (sb-thread:make-thread #'helper)
-            (robray::win-run :synchronous t))
-          (helper)))))
+	  (progn
+	    (robray::win-create :title "TMSMT"
+				:stop-on-quit t)
+	    (sb-thread:make-thread #'helper)
+	    (robray::win-run :synchronous t))
+	  (helper)))))

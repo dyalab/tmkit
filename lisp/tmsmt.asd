@@ -56,7 +56,9 @@
                ;(:file "moveit" :depends-on ("ros/ros-scene" "ros/ros-container" "motion-plan"))
                ;(:file "m-actions" :depends-on ("util" "motion-plan"))
                (:file "itmp-rec" :depends-on ("util"))
-               (:file "driver" :depends-on ("itmp-rec" "util" "config"))
+	       (:file "defaults" :depends-on ("itmp-rec" "task/pddl-sat" "tm-plan"))
+	       (:file "cpdl-tmp" :depends-on ("util"))
+               (:file "driver" :depends-on ("itmp-rec" "util" "config" "cpdl-tmp" "defaults"))
 
                (:file "foreign-tmplan" :depends-on ("tm-plan"))
                ;(:file "planvis" :depends-on ("util"))

@@ -4,7 +4,7 @@
 .deps/
 .libs/
 .dirstamp
-*.core
+*core
 /pddl/placement-graph/*.cnf
 /CMakeCache.txt
 /CTestTestfile.cmake
@@ -43,6 +43,8 @@ catkin_generated
 /doc/md/copying.md
 /demo/*.tmp
 /demo/baxter-sussman.pddl
+/demo/baxter-sussman/tm-blocks.pddl
+/demo/baxter-sussman/tm-blocks.py
 /scriptapi.md
 /tmsmt-*.tar.*
 /tmsmt-*
@@ -52,8 +54,14 @@ catkin_generated
 /demo/run/run-baxter-sussman-linear.sh
 /demo/run/run-baxter-sussman-safety.sh
 /demo/run/run-baxter-sussman.sh
+/demo/run/baxter-sussman-linear.tmp
 /demo/run/run-sussman.sh
 /tmsmt
+/test_cpdl
+/test_numeric_operations
+/test_path_checker
+/test_sequential
+/test_feedback
 /py-api.md
 /lisp/dir.lisp
 /tmkit*.tar.gz
@@ -64,3 +72,5 @@ catkin_generated
 /demo/baxter-model.c.h
 /demo/sussman-scene.c
 /demo/sussman-scene.c.h
+*~
+*.z3-trace
