@@ -67,7 +67,7 @@
 	 (thresh 0.5)
 	 (bool-init (reduce (lambda (ret var)
 			      (destructuring-case var
-				(('tmsmt/pddl::probabilistic val &rest args)
+				(('probabilistic val &rest args)
 				 (assert (numberp val))
 				 (setf (gethash (cons 0 (car args)) start-hash) val)
 				 (if (> val thresh)

@@ -187,7 +187,8 @@ CONSTRAINTS: What type of incremental constraints to use to generate alternate p
 			  planner-func
 			  communication-func
 			  motion-plan-func
-			  motion-timeout)
+			  motion-timeout
+			  write-facts)
 
 
   (setq *itmp-motion-time* 0d0
@@ -215,7 +216,8 @@ CONSTRAINTS: What type of incremental constraints to use to generate alternate p
 				 'default-communication))
 	 (motion-plan-func (or motion-plan-func
 			       'default-motion-plan))
-	 (options '((:max-steps . 10)(:trace . nil)))) ; TODO: actually parse given options
+	 (options (if options
+		      (read-from-string options))))
 
     ;; Load PDDL
     (dolist (x (ensure-list pddl))
@@ -228,9 +230,19 @@ CONSTRAINTS: What type of incremental constraints to use to generate alternate p
 	  (:problem
 	   (setq facts-exp (merge-facts facts-exp sexp))))))
 
-     ;; Maybe display scene
-      (when gui
-        (robray::win-set-scene-graph start-scene-graph :configuration-map start))
+    ;; Maybe write facts
+    (when write-facts
+      (format t "~&Write Facts: ~A~%" write-facts)
+      (let* ((scene-facts (scene-facts start-scene-graph goal-scene-graph
+				       :configuration start
+				       :operators (parse-operators domain-exp)))
+	     (all-facts (merge-facts facts-exp scene-facts))
+	     (rope (pddl-exp-rope all-facts)))
+	(output-rope rope write-facts :if-exists :supersede)))
+
+    ;; Maybe display scene
+    (when gui
+      (robray::win-set-scene-graph start-scene-graph :configuration-map start))
 
     (let ((plan (cpdl-tmp :start-graph start-scene-graph
 			  :start-q start
@@ -356,13 +368,14 @@ Written by Neil T. Dantam
 				 :scripts script-files
 				 :gui gui
 				 :pddl pddl-files
-				 :options (env-list "TMSMT_OPTIONS")
+				 :options (env-string "TMSMT_OPTIONS")
 				 :planner-func planner-func
 				 :communication-func (env-symb "TMSMT_COMMUNICATION")
 				 :motion-plan-func (env-symb "TMSMT_MOTION_PLANNER")
 				 :motion-timeout (if-let ((x (uiop/os:getenv "TMSMT_MOTION_TIMEOUT")))
 						   (max (amino::parse-float x)
-							0.1))))
+							0.1))
+				 :write-facts (uiop/os:getenv "TMSMT_WRITE_FACTS")))
 
 	       (t
 		;; Find the plan

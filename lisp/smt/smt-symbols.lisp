@@ -80,4 +80,7 @@
 
    :next
    :|next|
+
+   :probabilistic
+   :|probabilistic|
    ))

@@ -307,6 +307,15 @@ RETURNS: (VALUES pddl-sexp (or :domain :problem))"
 		     (rec type-list))))))
     (append obj-list (rec new-objs))))
 
+(defun equal-ignore-prob (o1 o2)
+  (let ((o1 (if (eq (car o1) 'probabilistic)
+		(caddr o1)
+		o1))
+	(o2 (if (eq (car o2) 'probabilistic)
+		(caddr o2)
+		o2)))
+    (equal o1 o2)))
+
 (defun merge-facts (exp1 exp2
                     &key
                       name)
@@ -334,7 +343,8 @@ RETURNS: (VALUES pddl-sexp (or :domain :problem))"
                      ((:init &rest things)
                       (setq merged-init (append merged-init (loop for x in things
 							       if (not
-								   (find x merged-init :test 'equal))
+								   (find x merged-init
+									 :test 'equal-ignore-prob))
 								 collect x))))
                      ((:goal goal)
                       (setq merged-goal

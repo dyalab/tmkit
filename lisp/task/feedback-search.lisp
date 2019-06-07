@@ -38,6 +38,9 @@
   ;; Distance away from 0.5 to create a set for fluents not have a value in the start state
   probability-offset
 
+  ;; Boolean to represent if we should increae the timestep next iteration
+  step-next
+
   ;; Max-steps to go to with cpd-solving
   max-steps
 
@@ -108,9 +111,10 @@
 ;; Helper function for modifiying the start state sent to CPD planner
 
 (defun feedback-planner-modify-threshold (feedback-planner)
-  (let* ((prob-offset (feedback-planner-probability-offset feedback-planner))
+  (let* ((prob-offset (+ 0.1 (feedback-planner-probability-offset feedback-planner)))
 	 (new-false   (- 0.5 prob-offset))
 	 (new-true    (+ 0.5 prob-offset))
+	 (step-next   (feedback-planner-step-next feedback-planner))
 	 (planner     (feedback-planner-planner feedback-planner))
 	 (domain      (cpd-planner-domain planner))
 	 (max-steps   (feedback-planner-max-steps feedback-planner))
@@ -129,18 +133,19 @@
 
     ;; Figure out what to do next
     (cond
-      ((and (or (<= new-false 0) (>= new-true 1))
-	    (= (cpd-planner-k planner) max-steps))
+      ((and step-next
+	   (= (cpd-planner-k planner) max-steps))
 
        ;; Quit if we have reached a bound and we have gone the max number of steps
        (values (feedback-planner-plan feedback-planner) nil feedback-planner
 	       (feedback-planner-success-probability feedback-planner)))
 
-      ((or (<= new-false 0) (>= new-true 1))
+      (step-next
 
        ;; Increase time-horizon and start re-tighten thresholds
        (format t "~%re-tightening threshold~%")
        (setf (feedback-planner-probability-offset feedback-planner) 0)
+       (setf (feedback-planner-step-next feedback-planner) nil)
 
        ;; Don't check plans where we reach the goal state in a previous timestep
        (setf (feedback-planner-low-plans feedback-planner)
@@ -179,13 +184,25 @@
        ;; Otherwise loosen the bounds
        (let* ((start-map (constrained-domain-start-map domain))
 	      (value-hash (probability-calculator-value-hash
-			   (feedback-planner-probability-calculator feedback-planner))))
+			   (feedback-planner-probability-calculator feedback-planner)))
+	      (succ-prob (feedback-planner-success-probability feedback-planner)))
 
 	 (format t "~%loosening threshold ~%")
+	 (if (> succ-prob 0.5)
+	     (progn
+	       (setf (feedback-planner-step-next feedback-planner) t)
+	       (setf new-true 0.5)
+	       (setf new-false 0.5))
+	     (if (> succ-prob new-false)
+		 (progn
+		   (setf (feedback-planner-step-next feedback-planner) t)
+		   (setf new-true (- 1 succ-prob))
+		   (setf new-false succ-prob))))
+
 	 (loosen-start-state start-map value-hash new-true new-false)
 	 (setf (constrained-domain-start-map domain) start-map)
 
-	 (setf (feedback-planner-probability-offset feedback-planner) (+ 0.1 prob-offset))
+	 (setf (feedback-planner-probability-offset feedback-planner) prob-offset)
 
 
 	 (cpd-smt-encode-start add domain)
@@ -289,8 +306,8 @@
     (funcall add '(pop 1))
     (funcall add '(push 1))
 
-    (setf (feedback-planner-true-thresh feedback-planner)  0.4)
-    (setf (feedback-planner-false-thresh feedback-planner) 0.6)
+    (setf (feedback-planner-probability-offset feedback-planner) 0)
+    (setf (feedback-planner-step-next feedback-planner) nil)
     (setf (cpd-planner-backtracking planner) t)
     (feedback-planner-modify-threshold feedback-planner)))
 
