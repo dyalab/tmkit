@@ -38,7 +38,7 @@
          (hash (make-hash-table :test #'equal))  ;; hash: variable => (list modifiying-operators)
          (empty-set (make-tree-set #'gsymbol-compare))
 	 (axioms (ground-domain-axioms ground)))
-    
+
     ;; Index modified variables
     (loop for action in actions
        for op-exp = (fluent-now (pddl-sat-op action))
@@ -47,7 +47,7 @@
             for set = (gethash v hash empty-set)
             for setp = (tree-set-insert set op-exp)
             do (setf (gethash v hash) setp)))
-    
+
     ;; collect axioms
     (loop for f in fluents
        for now = (fluent-now f)
@@ -115,7 +115,7 @@
 				 collect `(not ,(fluent-now op-b))))))))
       (add (cons 'or (loop for op-exp in action-fluents
 		      collect `(now ,op-exp))))
-      
+
       ;; frame
       (map nil #'add (pddl-sat-frame ground)))))
 
@@ -151,26 +151,26 @@
      (with-collected (add)
        ;; Fluents are probabilities not booleans
        (add `(probability-threshold ,(ground-domain-probability-threshold ground)))
-       
+
        ;; State variables
        (do-map (k v (ground-domain-variable-type ground))
 	 (if (is-bool v)
 	     (add `(declare-fluent ,k ,v))
 	     (add `(declare-fluent ,k |Real|))))
-       
+
        ;; Action variables
        (dolist (a (ground-domain-operators ground))
 	 (let ((a (pddl-sat-op a)))
 	   (add `(declare-fluent ,a |Bool|))
 	   (add `(output ,a))))
-       
+
        ;; Start
        (pddl-sat-start ground #'add)
-       
+
        ;; Goal
        (pddl-sat-goal ground (lambda (x) (add `(goal ,x))))
-		   
-       
+
+
        ;; Transition
        (pddl-sat-transition ground
 			    (lambda (x) (add `(transition ,x))))
@@ -187,8 +187,9 @@
 
 (defun pddl-sat (operators facts &optional options)
   (let ((cpd (pddl-sat-domain operators facts)))
-    (multiple-value-bind (results sat)
+    (multiple-value-bind (results sat planner)
         (cpd-plan cpd options)
       (values (when sat
                 (cpd-actions results))
-              sat))))
+              sat
+	      planner))))
