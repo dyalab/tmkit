@@ -97,83 +97,57 @@ CONSTRAINTS: What type of incremental constraints to use to generate alternate p
          (output (or output *standard-output*)))
     (finish-output *standard-output*)
 
-    (labels ((header-line (text list)
-               (loop for elt in list
-                  collect (rope text (typecase elt
-                                       (rope elt)
-                                       (otherwise "N/A"))
-                                #\Newline)))
-             (plan-header ()
-               (rope (header-line "# Semantics: " scripts)
-                     (loop for p in pddl
-                        collect
-                          (rope "# Task Domain: "
-                                (etypecase p
-                                  ((or pathname rope) p)
-                                  (t nil))
-                                #\Newline))
-                     (header-line "# Start Scene: " start-scene)
-                     (header-line "# Goal Scene: " goal-scene))))
 
-      ;; Load PDDL
-      (dolist (x (ensure-list pddl))
-        (multiple-value-bind (sexp type) (load-pddl-sexp x)
-          (ecase type
-            (:domain
-             (unless (null domain-exp)
-               (error "Multiple PDDL domains."))
-             (setq domain-exp sexp))
-            (:problem
-             (setq facts-exp (merge-facts facts-exp sexp))))))
 
-      ;; Maybe write facts
-      (when write-facts
-        (format t "~&Write Facts: ~A~%" write-facts)
-        (let* ((scene-facts (scene-facts start-scene-graph goal-scene-graph
-                                         :configuration start
-                                         :operators (parse-operators domain-exp)))
-               (all-facts (merge-facts facts-exp scene-facts))
-               (rope (pddl-exp-rope all-facts)))
-          (output-rope rope write-facts :if-exists :supersede)))
+    ;; Load PDDL
+    (dolist (x (ensure-list pddl))
+      (multiple-value-bind (sexp type) (load-pddl-sexp x)
+	(ecase type
+	  (:domain
+	   (unless (null domain-exp)
+	     (error "Multiple PDDL domains."))
+	   (setq domain-exp sexp))
+	  (:problem
+	   (setq facts-exp (merge-facts facts-exp sexp))))))
 
-      ;; Maybe display scene
-      (when gui
-        (robray::win-set-scene-graph start-scene-graph :configuration-map start))
+    ;; Maybe write facts
+    (when write-facts
+      (format t "~&Write Facts: ~A~%" write-facts)
+      (let* ((scene-facts (scene-facts start-scene-graph goal-scene-graph
+				       :configuration start
+				       :operators (parse-operators domain-exp)))
+	     (all-facts (merge-facts facts-exp scene-facts))
+	     (rope (pddl-exp-rope all-facts)))
+	(output-rope rope write-facts :if-exists :supersede)))
 
-      ;; Now plan!
-      (let ((plan (cond
-                    ;; Task-Motion Planning
-                    ((and start-scene domain-exp)
-                     (itmp-rec start-scene-graph goal-scene-graph
-                               domain-exp
-                               :times-file times-file
-                               :prefix-cache prefix-cache
-                               :constraints constraints
-                               :facts facts-exp
-                               :q-all-start start
-                               :max-steps max-steps))
-                    ;; Task plan only
-                    ((and domain-exp facts-exp)
-                     (map 'list (lambda (a)
-                                  (tm-op-action a nil nil))
-                          (smt-plan domain-exp facts-exp :max-steps max-steps)))
-                    ;; Unknown mode
-                    (t
-                     (format *error-output* "~&ERROR: invalid parameters~%")
-                     (format *error-output* "~&see `tmsmt --help' for usage~%")
-                     (quit-system -1)))))
+    ;; Maybe display scene
+    (when gui
+      (robray::win-set-scene-graph start-scene-graph :configuration-map start))
 
-        ;; Maybe display plan
-        (when (and gui plan)
-          (robray::win-display-motion-plan-sequence (tm-plan-motion-plans plan)))
+    ;; Now plan!
+    (let ((plan (cond
+		  ;; Task-Motion Planning
+		  ((and start-scene domain-exp)
+		   (itmp-rec start-scene-graph goal-scene-graph
+			     domain-exp
+			     :times-file times-file
+			     :prefix-cache prefix-cache
+			     :constraints constraints
+			     :facts facts-exp
+			     :q-all-start start
+			     :max-steps max-steps))
+		  ;; Task plan only
+		  ((and domain-exp facts-exp)
+		   (map 'list (lambda (a)
+				(tm-op-action a nil nil))
+			(smt-plan domain-exp facts-exp :max-steps max-steps)))
+		  ;; Unknown mode
+		  (t
+		   (format *error-output* "~&ERROR: invalid parameters~%")
+		   (format *error-output* "~&see `tmsmt --help' for usage~%")
+		   (quit-system -1)))))
 
-        ;; Output Plan
-        (if plan
-            (output-rope (rope (plan-header) plan)
-                         output :if-exists :supersede)
-            (progn (format *error-output* "~&ERROR: no plan found.~&")
-                   (quit-system 1)))))))
-
+      (output-plan plan gui output start-scene goal-scene scripts pddl))))
 
 
 (defun cpdl-tmp-driver (&key
@@ -188,7 +162,8 @@ CONSTRAINTS: What type of incremental constraints to use to generate alternate p
 			  communication-func
 			  motion-plan-func
 			  motion-timeout
-			  write-facts)
+			  write-facts
+			  output)
 
 
   (setq *itmp-motion-time* 0d0
@@ -216,8 +191,7 @@ CONSTRAINTS: What type of incremental constraints to use to generate alternate p
 				 'default-communication))
 	 (motion-plan-func (or motion-plan-func
 			       'default-motion-plan))
-	 (options (if options
-		      (read-from-string options))))
+	 (output (or output *standard-output*)))
 
     ;; Load PDDL
     (dolist (x (ensure-list pddl))
@@ -256,9 +230,38 @@ CONSTRAINTS: What type of incremental constraints to use to generate alternate p
 			  :communication-func communication-func
 			  :motion-plan-func motion-plan-func)))
 
-      ;; Maybe display plan
-      (when (and gui plan)
-	(robray::win-display-motion-plan-sequence plan)))))
+      (output-plan plan gui output start-scene goal-scene scripts pddl))))
+
+
+
+(defun output-plan (plan gui output start-scene goal-scene scripts pddl)
+  (labels ((header-line (text list)
+               (loop for elt in list
+                  collect (rope text (typecase elt
+                                       (rope elt)
+                                       (otherwise "N/A"))
+                                #\Newline)))
+             (plan-header ()
+               (rope (header-line "# Semantics: " scripts)
+                     (loop for p in pddl
+                        collect
+                          (rope "# Task Domain: "
+                                (etypecase p
+                                  ((or pathname rope) p)
+                                  (t nil))
+                                #\Newline))
+                     (header-line "# Start Scene: " start-scene)
+                     (header-line "# Goal Scene: " goal-scene))))
+    ;; Maybe display plan
+    (when (and gui plan)
+      (robray::win-display-motion-plan-sequence (tm-plan-motion-plans plan)))
+    ;; Output Plan
+    (if plan
+	(output-rope (rope (plan-header) plan)
+		     output :if-exists :supersede)
+	(progn (format *error-output* "~&ERROR: no plan found.~&")
+	       (quit-system 1)))))
+
 
 
 
@@ -368,14 +371,15 @@ Written by Neil T. Dantam
 				 :scripts script-files
 				 :gui gui
 				 :pddl pddl-files
-				 :options (env-string "TMSMT_OPTIONS")
+				 :options (env-list "TMSMT_OPT")
 				 :planner-func planner-func
 				 :communication-func (env-symb "TMSMT_COMMUNICATION")
 				 :motion-plan-func (env-symb "TMSMT_MOTION_PLANNER")
 				 :motion-timeout (if-let ((x (uiop/os:getenv "TMSMT_MOTION_TIMEOUT")))
 						   (max (amino::parse-float x)
 							0.1))
-				 :write-facts (uiop/os:getenv "TMSMT_WRITE_FACTS")))
+				 :write-facts (uiop/os:getenv "TMSMT_WRITE_FACTS")
+				 :output (uiop/os:getenv "TMSMT_OUTPUT")))
 
 	       (t
 		;; Find the plan
