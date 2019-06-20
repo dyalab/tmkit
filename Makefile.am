@@ -12,6 +12,7 @@ EXTRA_DIST =
 ####################
 ## Shared Library ##
 ####################
+include_HEADERS = include/tmsmt/tmplan.h
 
 lib_LTLIBRARIES += libtmsmt.la
 

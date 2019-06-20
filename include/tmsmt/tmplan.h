@@ -101,6 +101,20 @@ AA_API enum tmplan_op_type
 tmplan_op_type( const struct tmplan_op *op );
 
 /**
+ * Apply function to each op in the plan.
+ */
+AA_API int
+tmplan_map_ops (const struct tmplan *tmp,
+                void (*function)(void *cx, const struct tmplan_op *op),
+                void *cx );
+
+/**
+ * Removes and returns the first operator in the motion plan
+ */
+AA_API struct tmplan_op*
+tmplan_remove_first (struct tmplan *tmp);
+
+/**
  * @struct tmplan_op_action
  *
  * Opaque type for a task action.
@@ -147,13 +161,6 @@ AA_API void
 tmplan_op_motion_plan_vars ( struct tmplan_op_motion_plan *op,
                              size_t n, const char **name );
 
-/**
- * Apply function to each op in the plan.
- */
-AA_API int
-tmplan_map_ops (const struct tmplan *tmp,
-                void (*function)(void *cx, const struct tmplan_op *op),
-                void *cx );
 
 /**
  * Preprate to add points to the motion plan.

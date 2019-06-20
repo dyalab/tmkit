@@ -46,6 +46,11 @@ tmplan_last_op(struct tmplan * tmp)
     return tmp->last;
 }
 
+AA_API struct tmplan_op*
+tmplan_remove_first(struct tmplan * tmp){
+  return aa_mem_rlist_pop(tmp->rlist);
+}
+
 AA_API enum tmplan_op_type
 tmplan_op_type( const struct tmplan_op *op )
 {
