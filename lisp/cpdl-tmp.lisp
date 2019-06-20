@@ -10,23 +10,28 @@
 		   planner-func
 		   communication-func
 		   motion-plan-func
-		   scene-update-func)
+		   scene-update-func
+		   initialize-func)
   (format t "CPDL-TMP~%")
   (format t "Planning function: ~S~%" planner-func)
   (format t "Motion planning function: ~S~%" motion-plan-func)
   (format t "Communication function: ~S~%" communication-func)
   (format t "Scene update function: ~S~%" scene-update-func)
+  (format t "Initialize function: ~S~%" initialize-func)
+
+  (funcall initialize-func)
   (let (m-plan
 	(start-graph start-graph)
 	(start-q start-q))
     (labels ((new-plan (planner)
 	       (multiple-value-bind (plan sat planner prob)
 		   (funcall planner-func planner domain facts options)
-		 (if sat
+		 (if (and sat plan)
 		     (refine plan planner prob)
 		     m-plan)))
 	     (refine (plan planner prob)
-	       (format t "~a~%" plan)
+	       (format t "Success chance: ~d~%" prob)
+	       (format t "Plan: ~a~%" plan)
 	       (multiple-value-bind (new-start new-q)
 		   (funcall scene-update-func start-graph start-q)
 		 (setf start-graph new-start)
@@ -43,8 +48,6 @@
 		     (declare (ignore e))
 		     (funcall communication-func m-plan)
 		     (if (numberp prob)
-			 (if (> 1 prob)
 			     (new-plan planner)
-			     m-plan)
 			 m-plan))))))
       (new-plan nil))))

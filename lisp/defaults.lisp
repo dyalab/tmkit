@@ -15,6 +15,8 @@
 (defun default-scene-update (sg q)
   (values sg q))
 
+(defun default-initialize ())
+
 (defun default-probabilistic-cpdl-plan (planner domain facts options)
   (multiple-value-bind (plan sat planner prob)
       (if planner

@@ -262,6 +262,7 @@
 						    :true)))
 		prev-plans))
 
+      ;; Loop over previous discarded plans and make sure none of them are better
       (setf (feedback-planner-new-bounds feedback-planner)
 	    (remove nil (loop for (k . plan) in prev-plans
 			   collect (multiple-value-bind (prob trans-prob limiting-step)
@@ -269,13 +270,10 @@
 				     (let* ((limiting-actions
 					     (funcall feedback-func plan limiting-step domain))
 					    (bound-assert `(not ,(cons 'and limiting-actions))))
-				       (if (> prob best-prob)
-					   (progn
-					     (setf (feedback-planner-plan feedback-planner) plan)
-					     (setf (feedback-planner-best-k feedback-planner) k)
-					     (setf best-prob prob)
-					     (setf (feedback-planner-success-probability
-						    feedback-planner) prob)))
+				       (when (> prob best-prob)
+					 (setf best-plan plan)
+					 (setf best-k k)
+					 (setf best-prob prob))
 				       (if (< trans-prob best-prob)
 					   bound-assert
 					   (progn
@@ -283,6 +281,22 @@
 									   (cons trans-prob
 										 bound-assert)))
 					     nil)))))))
+
+      ;; Check to make sure we aren't in the goal state
+      (multiple-value-bind (goal-prob ign1 ign2)
+	  (calculate-plan-probability prob-calc nil 0 1)
+	(declare (ignore ign1 ign2))
+	(format t "Goal prob: ~a. Best prob: ~a~%" goal-prob best-prob)
+	(when (> goal-prob best-prob)
+	  (format t "Probably in goal state.~%")
+	  (setf best-prob goal-prob)
+	  (setf best-plan nil)
+	  (setf best-k 0)))
+
+      (setf (feedback-planner-plan feedback-planner) best-plan)
+      (setf (feedback-planner-best-k feedback-planner) best-k)
+      (setf (feedback-planner-success-probability feedback-planner) best-prob)
+
       (setf (feedback-planner-bound-set feedback-planner) bounds)
       (check-bounds feedback-planner best-prob)
       t)))
@@ -343,33 +357,43 @@
 
     (multiple-value-bind (prob-calc cpd)
 	(probability-calculator-init operator facts)
-      (let* ((initial-start (copy-hash-table (constrained-domain-start-map cpd)))
-	     (goal-funcs    (probability-calculator-goal-functions prob-calc))
-	     (value-hash    (probability-calculator-value-hash prob-calc))
-	     (succ-prob     (eval (cons '*
-					(loop for goal-func in goal-funcs
-					   collect (funcall
-						    goal-func value-hash 0))))))
-
 	;; Initialize constrained domain and feedback planners
-    (z3::choose-solver (solver t :trace trace)
-      (let ((planner (cpd-plan-init cpd solver cpd-opts 2)))
-	(incf (cpd-planner-k planner))
-	(cpd-smt-encode-fluents (cpd-planner-eval-function planner) cpd 1)
-	(make-feedback-planner :planner planner
-			       :probability-calculator prob-calc
-			       :initial-start initial-start
-			       :plan nil
-			       :success-probability succ-prob
-			       :bound-set (make-tree-set #'compare-first-element)
-			       :feedback-function (feedback-plan-option options
-									:feedback-func)
-			       :state-change-function (feedback-plan-option options
-									    :state-change-func)
-			       :probability-offset 0.1
-			       :max-steps (feedback-plan-option options :max-steps)
-			       :facts (load-facts facts)
-			       :operator (load-operators operator))))))))
+	(z3::choose-solver (solver t :trace trace)
+	  (let ((planner (cpd-plan-init cpd solver options 2)))
+	    (multiple-value-bind (plan sat)
+		(cpd-plan-next planner)
+	      (let* ((k (cpd-planner-k planner))
+		     (add (cpd-planner-eval-function planner))
+		     (succ-prob     (if sat
+					(calculate-plan-probability prob-calc plan k 0)
+					(calculate-plan-probability prob-calc nil 0 0))))
+
+		(loop while (cpd-planner-added-goals planner)
+		   do (cpd-planner-decrement-goal planner))
+		(setf (cpd-planner-backtracking planner) t)
+		(setf (cpd-planner-k planner) 0)
+		(setf (cpd-planner-options planner) cpd-opts)
+		(funcall add '(pop 1))
+		(funcall add '(push 1))
+		(cpd-smt-encode-goal add cpd (car (constrained-domain-goal-clauses cpd)) 0)
+		(make-feedback-planner :planner planner
+				       :probability-calculator prob-calc
+				       :initial-start (copy-hash-table
+						       (constrained-domain-start-map cpd))
+				       :plan (if sat plan nil)
+				       :success-probability succ-prob
+				       :bound-set (make-tree-set #'compare-first-element)
+				       :feedback-function (feedback-plan-option options
+										:feedback-func)
+				       :state-change-function (feedback-plan-option
+							       options
+							       :state-change-func)
+				       :probability-offset 0.1
+				       :max-steps (feedback-plan-option options :max-steps)
+				       :facts (load-facts facts)
+				       :operator (load-operators operator)
+				       :backtrack-k k
+				       :best-k (if sat k 0)))))))))
 
 
 (defun feedback-planner-next (feedback-planner new-plan)
@@ -403,7 +427,9 @@
 	   (funcall add '(pop 1))
 
 	   ;; Prefer plans that are less steps
-	   (if (> new-prob current-prob)
+	   (if (or (> new-prob current-prob)
+		   (and (= new-prob current-prob)
+			(> (feedback-planner-best-k feedback-planner) k)))
 	       (progn
 		 (format t "~%Success probability: ~D ~%" new-prob)
 		 (setf (feedback-planner-success-probability feedback-planner) new-prob)
@@ -449,9 +475,8 @@
   (if (check-state feedback-planner)
       (restart-planning feedback-planner)
       (let ((planner (feedback-planner-planner feedback-planner)))
-	(multiple-value-bind (plan sat planner)
+	(multiple-value-bind (plan sat)
 	    (funcall step-func planner)
-	  (declare (ignore planner))
 	  (if sat
 	      (feedback-planner-next feedback-planner plan)
 	      (feedback-planner-modify-threshold feedback-planner))))))

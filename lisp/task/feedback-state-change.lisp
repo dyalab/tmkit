@@ -1,31 +1,31 @@
 (in-package :tmsmt)
 
+(defun replace-symb (seq new-symb old-symb)
+  (loop for s in seq
+     collect (if (listp s)
+		 (replace-symb s new-symb old-symb)
+		 (if (eq s old-symb)
+		     new-symb
+		     s))))
 
-(defun add-object (object-type new-fluents facts)
-  (let* ((objects (pddl-facts-objects facts))
-	 (num (+ 1 (count object-type objects :test (lambda (type obj)
-						      (eq (pddl-typed-type obj)
-							  type)))))
-	 (new-obj (make-pddl-typed
-		   :name (intern (concatenate
-				  'string
-				  (format nil "~s" object-type)
-				  (format nil "~D" num))
-				 :tmsmt/pddl)
-		   :type object-type))
-	 (new-fluents (loop for fluent in new-fluents
-			   collect (substitute (pddl-typed-name new-obj) '? fluent))))
+
+(defun add-object (name type new-fluents facts)
+  (let* ((new-obj (make-pddl-typed
+		   :name name
+		   :type type))
+	 (new-fluents (replace-symb new-fluents (pddl-typed-name new-obj) '?)))
     (push new-obj
 	  (pddl-facts-objects facts))
     (setf (pddl-facts-init facts)
 	  (append new-fluents
 		  (pddl-facts-init facts)))))
 
-(defun remove-object (object facts)
+(defun remove-object (name facts)
   (setf (pddl-facts-objects facts)
-	(remove object (pddl-facts-objects facts) :test #'equalp))
-  (let* ((name (pddl-typed-name object))
-	 (init (pddl-facts-init facts))
+	(remove name (pddl-facts-objects facts) :test (lambda (name obj)
+							  (eq (pddl-typed-name obj)
+							      name))))
+  (let* ((init (pddl-facts-init facts))
 	 (new-init (reduce (lambda (ret var)
 			     (if (find name var :test #'equal)
 				 ret
@@ -39,8 +39,8 @@
   (let ((facts (feedback-planner-facts feedback-planner))
 	(domain (feedback-planner-operator feedback-planner)))
 
-    (loop for (object new-fluents) in add-objects
-       do (add-object object new-fluents facts))
+    (loop for (name type new-fluents) in add-objects
+       do (add-object name type new-fluents facts))
 
     (loop for object in remove-objects
        do (remove-object object facts))

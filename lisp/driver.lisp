@@ -161,6 +161,8 @@ CONSTRAINTS: What type of incremental constraints to use to generate alternate p
 			  planner-func
 			  communication-func
 			  motion-plan-func
+			  scene-update-func
+			  initialize-func
 			  motion-timeout
 			  write-facts
 			  output)
@@ -191,6 +193,10 @@ CONSTRAINTS: What type of incremental constraints to use to generate alternate p
 				 'default-communication))
 	 (motion-plan-func (or motion-plan-func
 			       'default-motion-plan))
+	 (scene-update-func (or scene-update-func
+				'default-scene-update))
+	 (initialize-func (or initialize-func
+			      'default-initialize))
 	 (output (or output *standard-output*)))
 
     ;; Load PDDL
@@ -228,7 +234,9 @@ CONSTRAINTS: What type of incremental constraints to use to generate alternate p
 			  :options options
 			  :planner-func planner-func
 			  :communication-func communication-func
-			  :motion-plan-func motion-plan-func)))
+			  :motion-plan-func motion-plan-func
+			  :scene-update-func scene-update-func
+			  :initialize-func initialize-func)))
 
       (output-plan plan gui output start-scene goal-scene scripts pddl))))
 
@@ -374,6 +382,8 @@ Written by Neil T. Dantam
 				 :options (env-list "TMSMT_OPT")
 				 :planner-func planner-func
 				 :communication-func (env-symb "TMSMT_COMMUNICATION")
+				 :scene-update-func (env-symb "TMSMT_SCENE_UPDATE")
+				 :initialize-func (env-symb "TMSMT_INITIALIZE")
 				 :motion-plan-func (env-symb "TMSMT_MOTION_PLANNER")
 				 :motion-timeout (if-let ((x (uiop/os:getenv "TMSMT_MOTION_TIMEOUT")))
 						   (max (amino::parse-float x)

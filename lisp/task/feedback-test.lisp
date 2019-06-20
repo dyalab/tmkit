@@ -27,13 +27,11 @@
 	   (not ( gethash '(0 tmsmt/pddl::have-mover tmsmt/pddl::mover1)
 			  (probability-calculator-value-hash
 			   (feedback-planner-probability-calculator feedback-planner)))))
-      (make-state-changes feedback-planner `((mover  ((tmsmt/pddl::have-mover ?)))) nil)))
+      (make-state-changes feedback-planner `((mover1 mover  ((tmsmt/pddl::have-mover ?)))) nil)))
 
 (defun test-remove-object (feedback-planner)
   (if (and (= (cpd-planner-k (feedback-planner-planner feedback-planner)) 3)
 	   (gethash '(0 tmsmt/pddl::have-mover tmsmt/pddl::mover1)
 		    (probability-calculator-value-hash
 		     (feedback-planner-probability-calculator feedback-planner))))
-      (make-state-changes feedback-planner nil `(,(make-pddl-typed
-						:name 'tmsmt/pddl::mover1
-						:type 'tmsmt/pddl::mover)))))
+      (make-state-changes feedback-planner nil `(tmsmt/pddl::mover1))))
